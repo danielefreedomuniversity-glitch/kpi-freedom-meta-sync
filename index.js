@@ -42,7 +42,7 @@ function checkKey(req, res, next) {
 const FIELDS = [
   "campaign_name", "adset_name", "ad_name",
   "spend", "impressions", "reach", "clicks", "inline_link_clicks",
-  "actions", "video_p3_sec_watched_actions", "video_thruplay_watched_actions"
+  "actions", "video_thruplay_watched_actions"
 ].join(",");
 
 /* estrae un contatore da "actions" (le conversioni Meta sono lì dentro) */
@@ -94,7 +94,9 @@ function toDashboardShape(rows) {
       impressions: parseInt(row.impressions || 0, 10),
       reach: parseInt(row.reach || 0, 10),
       click: parseInt(row.inline_link_clicks ?? row.clicks ?? 0, 10),
-      video3s: actionValue(row.video_p3_sec_watched_actions, "video_view"),
+      // Meta non espone più un campo dedicato alle "riproduzioni da 3 secondi":
+      // si approssima con il conteggio generale delle visualizzazioni video.
+      video3s: actionValue(row.actions, "video_view"),
       thruplay: actionValue(row.video_thruplay_watched_actions, "video_view"),
       // "visite" (landing page view) e "lead" arrivano dentro "actions"
       visite: actionValue(row.actions, "landing_page_view"),
