@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KPI Funnel · Freedom University</title>
+<style>
+:root{
+  --bg:#0C0F13; --surface:#14181E; --surface-2:#1A2029; --raise:#20262F;
+  --ink:#EDF1F6; --ink-2:#A9B4C0; --ink-3:#6B7684;
+  --line:#262E38; --line-2:#1E252E;
+  --adv:#5C8DFF; --set:#F0A63C; --clo:#C08DF0; --eco:#3ECF8E;
+  --ok:#3ECF8E; --warn:#F0A63C; --bad:#FF6D5E; --mute:#6B7684;
+  --sans:"Inter","Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13px;line-height:1.45;
+     padding:0 0 60px;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1780px;margin:0 auto;padding:0 16px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ---------- header ---------- */
+header{background:#080A0D;border-bottom:1px solid var(--line);padding:14px 0;position:sticky;top:0;z-index:50}
+.hrow{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.brand h1{font-size:18px;font-weight:800;letter-spacing:-.02em;line-height:1.1;color:#fff}
+.brand .sub{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-top:3px}
+.controls{margin-left:auto;display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}
+.ctl{display:flex;flex-direction:column;gap:4px}
+.ctl label{font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+select,.btn,input[type=month]{font-family:var(--sans);font-size:12px;border-radius:4px;border:1px solid var(--line);
+      background:var(--surface-2);color:var(--ink);padding:7px 11px;cursor:pointer}
+select,input[type=month]{font-weight:600}
+input[type=month]{color-scheme:dark}
+.btn:hover{background:var(--raise)}
+.btn.solid{background:var(--adv);color:#0A1020;border-color:var(--adv);font-weight:800}
+.btn.solid:hover{filter:brightness(1.1)}
+.btn:focus-visible,select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--adv);outline-offset:1px}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:14px;align-items:start;margin-top:14px}
+.side{position:sticky;top:78px;max-height:calc(100vh - 96px);overflow:auto;padding-right:2px;scrollbar-width:thin}
+.sidehead{font-size:8.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);padding:4px 2px 8px}
+
+/* rettangoli */
+.box{display:block;width:100%;text-align:left;font-family:inherit;color:var(--ink);cursor:pointer;
+     background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line);
+     border-radius:6px;padding:10px 12px;margin-bottom:7px}
+.box:hover{background:var(--surface-2)}
+.box.on{background:var(--surface-2);border-color:var(--adv);border-left-width:4px;box-shadow:0 0 0 1px var(--adv)}
+.box .bn{font-weight:700;font-size:13px;letter-spacing:-.01em;display:flex;align-items:center;gap:7px;line-height:1.3}
+.box .bt{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);
+         margin-bottom:3px;display:flex;justify-content:space-between;align-items:center}
+.box .bs{display:flex;gap:12px;margin-top:6px;font-family:var(--mono);font-size:10.5px;color:var(--ink-2)}
+.box .bs b{font-weight:600;color:var(--ink)}
+.box.v-scala{border-left-color:var(--ok)}.box.v-mantieni{border-left-color:var(--warn)}
+.box.v-kill{border-left-color:var(--bad)}.box.v-dati{border-left-color:var(--mute)}
+.box.on.v-scala{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok)}
+.box.on.v-mantieni{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn)}
+.box.on.v-kill{border-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
+.box.on.v-dati{border-color:var(--mute);box-shadow:0 0 0 1px var(--mute)}
+.box.adset{margin-left:16px;width:calc(100% - 16px);padding:8px 11px}
+.box.adset .bn{font-size:12px;font-weight:600}
+.box.total{margin-bottom:14px}
+.box.total .bn{text-transform:uppercase;letter-spacing:.04em;font-size:12px}
+.tw{font-size:9px;color:var(--ink-3);transition:transform .15s ease;display:inline-block}
+.box.open .tw{transform:rotate(90deg)}
+.addbtn{width:100%;text-align:center;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:8px;border-radius:6px;
+        background:transparent;border:1px dashed var(--line);color:var(--ink-3);cursor:pointer;font-family:inherit;margin-bottom:7px}
+.addbtn:hover{border-color:var(--ink-3);color:var(--ink-2)}
+.addbtn.sm{margin-left:16px;width:calc(100% - 16px);margin-bottom:9px}
+
+/* ---------- pannello ---------- */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;min-width:0;overflow:hidden}
+.phead{padding:16px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:var(--surface-2)}
+.peyebrow{font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.ptitle{font-size:22px;font-weight:800;letter-spacing:-.02em;border:1px solid transparent;background:transparent;
+        font-family:inherit;color:var(--ink);padding:1px 4px;margin-left:-4px;width:100%;max-width:460px;border-radius:4px}
+.ptitle:hover{border-color:var(--line)}
+.ptitle:focus{border-color:var(--adv);background:var(--surface);outline:none}
+.pmeta{font-size:11px;color:var(--ink-2);margin-top:2px}
+
+/* spina funnel */
+.spine{display:flex;gap:4px;height:42px;min-width:320px;max-width:470px;flex:1;margin-left:auto}
+.seg{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:4px;
+     display:flex;flex-direction:column;justify-content:center;padding:4px 9px;overflow:hidden;min-width:0;flex:1}
+.seg .fill{position:absolute;left:0;top:0;bottom:0;opacity:.22}
+.seg .l1{position:relative;display:flex;justify-content:space-between;align-items:baseline;gap:5px;line-height:1}
+.seg .sl{font-size:7.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.seg .sr{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--ink-2)}
+.seg .sv{position:relative;font-family:var(--mono);font-size:14px;font-weight:700;line-height:1.25;margin-top:2px;color:#fff}
+.seg.s1{border-color:#2B4373}.seg.s1 .fill{background:var(--adv)}
+.seg.s2{border-color:#6B4E1E}.seg.s2 .fill{background:var(--set)}
+.seg.s3{border-color:#57406E}.seg.s3 .fill{background:var(--clo)}
+.seg.s4{border-color:#1F5C42}.seg.s4 .fill{background:var(--eco)}
+
+.chip{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:5px 10px;
+      border-radius:4px;white-space:nowrap;border:1px solid;display:inline-block}
+.chip.sm{font-size:8px;padding:2px 6px;letter-spacing:.06em}
+.chip.scala{background:rgba(62,207,142,.12);color:var(--ok);border-color:rgba(62,207,142,.4)}
+.chip.mantieni{background:rgba(240,166,60,.12);color:var(--warn);border-color:rgba(240,166,60,.4)}
+.chip.kill{background:rgba(255,109,94,.12);color:var(--bad);border-color:rgba(255,109,94,.4)}
+.chip.dati{background:rgba(107,118,132,.12);color:var(--ink-2);border-color:var(--line)}
+
+.secbar{display:flex;align-items:center;gap:9px;padding:10px 18px;background:var(--surface);
+        border-bottom:1px solid var(--line);border-top:1px solid var(--line);flex-wrap:wrap}
+.secbar .t{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+.tog{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:4px 9px;border-radius:3px;
+     border:1px solid var(--line);background:transparent;cursor:pointer;color:var(--ink-3);font-family:inherit}
+.tog[aria-pressed="true"]{color:#0A1020;border-color:transparent;font-weight:800}
+.tog[data-g="adv"][aria-pressed="true"]{background:var(--adv)}
+.tog[data-g="set"][aria-pressed="true"]{background:var(--set)}
+.tog[data-g="clo"][aria-pressed="true"]{background:var(--clo)}
+.tog[data-g="eco"][aria-pressed="true"]{background:var(--eco)}
+
+/* ---------- tabella ---------- */
+.tscroll{overflow-x:auto;background:var(--surface)}
+table{border-collapse:separate;border-spacing:0;font-size:12px;width:max-content;min-width:100%}
+th,td{padding:7px 10px;white-space:nowrap;border-bottom:1px solid var(--line-2);text-align:right}
+thead th{position:sticky;top:0;background:var(--surface);z-index:2;font-size:8.5px;font-weight:700;letter-spacing:.05em;
+         text-transform:uppercase;color:var(--ink-2);border-bottom:1px solid var(--line);vertical-align:bottom}
+tr.grouprow th{position:sticky;top:0;z-index:3;font-size:9px;font-weight:800;letter-spacing:.16em;text-align:left;
+    color:#0A1020;padding:4px 10px;border-bottom:none}
+th.g-adv,td.g-adv{background:#151B26}th.g-set,td.g-set{background:#1A1812}
+th.g-clo,td.g-clo{background:#191521}th.g-eco,td.g-eco{background:#121B17}
+tr.grouprow th.g-adv{background:var(--adv)}tr.grouprow th.g-set{background:var(--set)}
+tr.grouprow th.g-clo{background:var(--clo)}tr.grouprow th.g-eco{background:var(--eco)}
+tr.grouprow th.g-ana{background:var(--raise);color:var(--ink-2)}
+th.sticky,td.sticky{position:sticky;left:0;z-index:1;text-align:left;background:var(--surface);
+                    border-right:1px solid var(--line);min-width:200px}
+thead th.sticky{z-index:4}tr.grouprow th.sticky{z-index:5}
+tbody tr:hover td{background:var(--surface-2)}
+td.val{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+td.zero{color:#3A4450}
+tr.totrow td{background:var(--raise);font-weight:700;border-top:2px solid var(--adv);border-bottom:none;color:#fff}
+tr.totrow:hover td{background:#242B35}
+tr.dayrow td{background:#10141A;color:var(--ink-2)}
+tr.dayrow td.sticky{padding-left:32px;font-size:11.5px;background:#10141A}
+tr.dayrow:hover td{background:var(--surface-2)}
+tr.wkrow td.sticky{font-weight:700;color:#fff}
+tr.crrow td.sticky{font-weight:600;color:#fff}
+.rowbtn{background:none;border:none;font-family:inherit;font-size:inherit;font-weight:inherit;color:inherit;
+        cursor:pointer;display:flex;align-items:center;gap:8px;padding:0;text-align:left;width:100%}
+.rowbtn .tw{width:9px;flex:none}
+.rowbtn.open .tw{transform:rotate(90deg)}
+.wksub{font-size:9px;color:var(--ink-3);font-weight:400;font-family:var(--mono)}
+.rowmeta{font-size:9.5px;color:var(--ink-3);font-weight:400;margin-top:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+input.inp{font-family:var(--mono);font-size:12px;width:78px;text-align:right;padding:3px 6px;
+  border:1px solid transparent;background:#132038;border-radius:3px;color:#8FB3FF;font-weight:600}
+input.inp:hover{border-color:#2B4373}
+input.inp:focus{outline:none;border-color:var(--adv);background:#0E1930;color:#fff}
+input.inp::-webkit-outer-spin-button,input.inp::-webkit-inner-spin-button{-webkit-appearance:none}
+.hint{padding:10px 18px;font-size:11px;color:var(--ink-3);background:var(--surface);border-top:1px solid var(--line-2)}
+.hint b{color:var(--ink-2);font-weight:700}
+.mini{font-size:9.5px;font-weight:700;padding:2px 7px;border:1px solid var(--line);background:transparent;
+      border-radius:3px;cursor:pointer;color:var(--ink-3);font-family:inherit}
+.mini:hover{background:var(--surface-2);color:var(--ink)}
+.mini.danger:hover{color:var(--bad);border-color:var(--bad)}
+.addbar{padding:10px 18px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line-2)}
+
+/* ---------- modali ---------- */
+.ov{position:fixed;inset:0;background:rgba(2,4,7,.72);display:none;z-index:60;padding:20px;overflow:auto}
+.ov.on{display:block}
+.modal{background:var(--surface);max-width:660px;margin:40px auto;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.modal h2{font-size:15px;font-weight:800;padding:14px 18px;border-bottom:1px solid var(--line);color:#fff}
+.mbody{padding:14px 18px}
+.mbody p{font-size:12px;color:var(--ink-2)}
+.mbody ol{font-size:12px;color:var(--ink-2);padding-left:18px;line-height:1.7}
+.mbody ol b{color:var(--ink)}
+.prow{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line-2)}
+.prow .pl{flex:1;font-size:12px;color:var(--ink)}
+.prow .pn{font-size:10px;color:var(--ink-3);margin-top:1px}
+.prow input,.prow select{font-family:var(--mono);width:110px;text-align:right;padding:5px 8px;
+  border:1px solid var(--line);border-radius:3px;background:#132038;color:#8FB3FF;font-weight:600;font-size:12px}
+.prow select{font-family:var(--sans);text-align:left;color:var(--ink);background:var(--surface-2)}
+.prow .ro{font-family:var(--mono);width:110px;text-align:right;font-weight:600;color:var(--ink-3);font-size:12px}
+.mfoot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;background:var(--surface-2)}
+.mfoot .btn.sec{background:transparent}
+textarea{width:100%;height:150px;font-family:var(--mono);font-size:11px;padding:8px;border:1px solid var(--line);
+  background:var(--surface-2);color:var(--ink);border-radius:4px}
+.filebtn{display:inline-block;padding:9px 14px;border-radius:4px;background:var(--adv);color:#0A1020;font-weight:800;
+  font-size:12px;cursor:pointer}
+.filebtn:hover{filter:brightness(1.1)}
+.impmsg{margin-top:10px;font-size:11.5px;font-family:var(--mono);white-space:pre-wrap;color:var(--ink-2);
+  background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:10px;display:none}
+.foot{padding:18px 2px 0;font-size:11px;color:var(--ink-3);line-height:1.65}
+.foot b{color:var(--ink-2)}
+@media (max-width:1150px){
+  .layout{grid-template-columns:1fr}
+  .side{position:static;max-height:none;display:flex;gap:8px;overflow-x:auto;padding-bottom:6px}
+  .side>*{flex:0 0 214px;margin:0}
+  .box.adset,.addbtn.sm{margin-left:0;width:214px}
+  .spine{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap hrow">
+    <div class="brand">
+      <h1>KPI Funnel — Freedom University</h1>
+      <div class="sub" id="subline"></div>
+      <div class="sub" id="syncInfo" style="color:#3ECF8E"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label for="mese">Mese</label>
+        <input type="month" id="mese" value="2026-08"></div>
+      <div class="ctl"><label for="wk">Periodo</label>
+        <select id="wk"><option value="ALL">Tutto il mese</option></select></div>
+      <button class="btn solid" id="bNow">Aggiorna adesso</button>
+      <button class="btn" id="bMeta">Sync</button>
+      <button class="btn" id="bParam">Parametri</button>
+      <button class="btn" id="bExp">Esporta CSV</button>
+      <button class="btn" id="bJson">Backup</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="layout">
+    <aside class="side" id="side"></aside>
+    <main class="panel" id="panel"></main>
+  </div>
+  <div class="foot" id="foot"></div>
+</div>
+
+<div class="ov" id="ovParam"><div class="modal">
+  <h2 id="pTitle">Parametri economici e soglie</h2>
+  <div class="mbody" id="paramBody"></div>
+  <div class="mfoot"><button class="btn sec" data-close>Chiudi</button><button class="btn solid" id="pSave">Salva</button></div>
+</div></div>
+
+<div class="ov" id="ovMeta"><div class="modal">
+  <h2>Sincronizzazione dati</h2>
+  <div class="mbody">
+
+    <div style="display:flex;gap:6px;margin-bottom:14px" id="metaTabs">
+      <button class="tog" data-tab="auto" aria-pressed="true" style="padding:6px 12px">Sincronizzazione automatica</button>
+      <button class="tog" data-tab="csv" aria-pressed="false" style="padding:6px 12px">Esportazione CSV manuale</button>
+    </div>
+
+    <div id="tabAuto">
+      <p style="margin-bottom:10px">La dashboard si aggiorna <b>da sola all'apertura e poi ogni 15 minuti</b>: legge Meta (spesa, click, lead, video), GHL (call fissate, show, vendite, cash — attribuiti a campagna, adset e creativa tramite UTM, solo lead Facebook) e il foglio Google dei setter (tentativi, lead assegnati, riprogrammate).</p>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn solid" id="bNow2">Aggiorna adesso</button>
+        <span id="syncStatus" style="font-size:11px;color:var(--ink-3)"></span>
+      </div>
+      <div class="impmsg" id="syncMsg"></div>
+    </div>
+
+    <div id="tabCsv" style="display:none">
+      <p style="margin-bottom:10px">Alternativa senza server: esporta il CSV da Gestione inserzioni e caricalo qui.</p>
+      <ol>
+        <li>In <b>Gestione inserzioni</b> vai a livello <b>Inserzioni</b> e imposta l'intervallo di date (es. il mese intero).</li>
+        <li><b>Suddivisione → Per periodo di tempo → Giorno</b>.</li>
+        <li>Colonne consigliate: importo speso, impressioni, copertura, clic sul link, visualizzazioni della pagina di destinazione, riproduzioni video da 3 secondi, ThruPlay, lead.</li>
+        <li><b>Esporta → Esporta dati della tabella → .csv</b>, poi caricalo qui sotto.</li>
+      </ol>
+      <p style="margin:10px 0 12px">Campagne, adset e inserzioni vengono creati o aggiornati in base al nome; i giorni presenti nel file vengono sovrascritti solo nella parte Advertising. Setting, Closing ed Economics restano tuoi.</p>
+      <label class="filebtn">Carica CSV esportato da Meta<input type="file" id="metaFile" accept=".csv,text/csv" style="display:none"></label>
+      <div class="impmsg" id="impMsg"></div>
+    </div>
+
+  </div>
+  <div class="mfoot"><button class="btn sec" data-close>Chiudi</button></div>
+</div></div>
+
+<div class="ov" id="ovJson"><div class="modal">
+  <h2>Backup e ripristino</h2>
+  <div class="mbody">
+    <p style="margin-bottom:10px">Copia il testo per conservare i dati, oppure incollane uno salvato e premi Ripristina.</p>
+    <textarea id="jsonBox" spellcheck="false"></textarea>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn solid" id="jRestore">Ripristina da testo</button>
+      <button class="btn" id="jWipe" style="color:var(--bad);border-color:var(--bad)">Svuota tutto</button>
+    </div>
+  </div>
+  <div class="mfoot"><button class="btn sec" data-close>Chiudi</button></div>
+</div></div>
+
+<div class="ov" id="ovLogin"><div class="modal" style="max-width:400px">
+  <h2>KPI Freedom University</h2>
+  <div class="mbody">
+    <p style="margin-bottom:12px">Inserisci la password per accedere alla dashboard.</p>
+    <input type="password" id="pwIn" placeholder="Password" autocomplete="current-password"
+      style="width:100%;padding:10px 12px;font-size:14px;border:1px solid var(--line);border-radius:4px;background:var(--surface-2);color:var(--ink)">
+    <div id="pwErr" style="margin-top:8px;font-size:12px;color:var(--bad);display:none">Password errata, riprova.</div>
+    <button class="btn solid" id="bLogin" style="margin-top:12px;width:100%;padding:10px">Entra</button>
+  </div>
+</div></div>
+
+<script>
+/* ============================================================
+   KPI FUNNEL — modello identico al foglio KPI (colonne A→BO)
+   IN  = celle blu da compilare      CALC = formule
+   ============================================================ */
+const WEEKS = ["Settimana 1","Settimana 2","Settimana 3","Settimana 4"];
+const FORMATI = ["Video 15s","Video 30s","Video 60s","Video 90s+","UGC","Statica","Carosello","Reel"];
+const ANGOLI = ["Libertà finanziaria","Uscire dal 9-18","Da 0 a 5k in 90gg","Errore n.1 dei principianti","Testimonianza allievo","Dietro le quinte"];
+
+const div = (a,b) => (b ? a/b : 0);
+
+/* g = gruppo · k = chiave · t = in|calc · f = formato · c = formula */
+const COLS = [
+ {g:"adv",k:"spesa",       l:"Spesa €",            t:"in",  f:"eur"},
+ {g:"adv",k:"impressions", l:"Impressions",        t:"in",  f:"int"},
+ {g:"adv",k:"reach",       l:"Reach",              t:"in",  f:"int"},
+ {g:"adv",k:"frequenza",   l:"Frequenza",          t:"calc",f:"n2", c:d=>div(d.impressions,d.reach)},
+ {g:"adv",k:"click",       l:"Click sul link",     t:"in",  f:"int"},
+ {g:"adv",k:"cpl",         l:"CPL",                t:"calc",f:"eur2",c:d=>div(d.spesa,d.lead), tgt:"cpl"},
+ {g:"adv",k:"lead",        l:"LEAD (opt-in)",      t:"in",  f:"int", key:true},
+ {g:"adv",k:"ctr",         l:"CTR",                t:"calc",f:"pct",c:d=>div(d.click,d.impressions)},
+ {g:"adv",k:"cpc",         l:"CPC",                t:"calc",f:"eur2",c:d=>div(d.spesa,d.click)},
+ {g:"adv",k:"cpm",         l:"CPM",                t:"calc",f:"eur2",c:d=>div(d.spesa,d.impressions)*1000},
+ {g:"adv",k:"visiteVsl",   l:"Visite Landing VSL", t:"in",  f:"int"},
+ {g:"adv",k:"visiteSurvey",l:"Visite Survey",      t:"in",  f:"int"},
+ {g:"adv",k:"visiteTy",    l:"Visite Thank You Page",t:"in",f:"int"},
+ {g:"adv",k:"visiteWebinar",l:"Visite Webinar",    t:"in",  f:"int"},
+ {g:"adv",k:"visiteWol",   l:"Visite Wall of Love",t:"in",  f:"int"},
+ {g:"adv",k:"video25",     l:"Riproduzione video 25%",t:"in",f:"int"},
+ {g:"adv",k:"video50",     l:"Riproduzione video 50%",t:"in",f:"int"},
+ {g:"adv",k:"video75",     l:"Riproduzione video 75%",t:"in",f:"int"},
+ {g:"adv",k:"video100",    l:"Riproduzione video 100%",t:"in",f:"int"},
+ {g:"adv",k:"thruplay",    l:"ThruPlay",           t:"in",  f:"int"},
+ {g:"adv",k:"hookRate",    l:"Hook Rate",          t:"calc",f:"pct",c:d=>div(d.video25,d.impressions)},
+ {g:"adv",k:"holdRate",    l:"Hold Rate",          t:"calc",f:"pct",c:d=>div(d.video75,d.video25)},
+ {g:"adv",k:"cvrLanding",  l:"CVR Landing",        t:"calc",f:"pct",c:d=>div(d.lead,d.visiteVsl)},
+
+ {g:"set",k:"assegnati",   l:"Lead assegnati",     t:"in",  f:"int"},
+ {g:"set",k:"tentativi",   l:"Tentativi chiamata", t:"in",  f:"int"},
+ {g:"set",k:"contattati",  l:"Lead contattati",    t:"in",  f:"int"},
+ {g:"set",k:"contactRate", l:"Contact Rate",       t:"calc",f:"pct",c:d=>div(d.contattati,d.assegnati)},
+ {g:"set",k:"fissate",     l:"CALL FISSATE",       t:"in",  f:"int", key:true},
+ {g:"set",k:"setRateCont", l:"Set Rate su contattati",t:"calc",f:"pct",c:d=>div(d.fissate,d.contattati)},
+ {g:"set",k:"setRateLead", l:"Set Rate su lead",   t:"calc",f:"pct",c:d=>div(d.fissate,d.assegnati)},
+ {g:"set",k:"cpaFissata",  l:"CPA Call Fissata",   t:"calc",f:"eur2",c:d=>div(d.spesa,d.fissate)},
+ {g:"set",k:"nonInteressato",l:"Non interessato",  t:"in",  f:"int"},
+ {g:"set",k:"nonInteressatoRate",l:"Non interessato Rate su contattati",t:"calc",f:"pct",c:d=>div(d.nonInteressato,d.contattati)},
+ {g:"set",k:"nonTarget",   l:"Non in target",      t:"in",  f:"int"},
+ {g:"set",k:"nonTargetRate",l:"Non in target Rate su contattati",t:"calc",f:"pct",c:d=>div(d.nonTarget,d.contattati)},
+ {g:"set",k:"nonFissati",  l:"Non fissati",        t:"in",  f:"int"},
+ {g:"set",k:"nonFissatiRate",l:"Non fissati Rate su contattati",t:"calc",f:"pct",c:d=>div(d.nonFissati,d.contattati)},
+ {g:"set",k:"riprog",      l:"Riprogrammate",      t:"in",  f:"int"},
+ {g:"set",k:"noShow",      l:"No Show",            t:"in",  f:"int"},
+ {g:"set",k:"noShowRate",  l:"No Show Rate",       t:"calc",f:"pct",c:d=>div(d.noShow,d.fissate)},
+ {g:"set",k:"show",        l:"CALL SHOW",          t:"in",  f:"int", key:true},
+ {g:"set",k:"showRate",    l:"Show Rate",          t:"calc",f:"pct",c:d=>div(d.show,d.fissate)},
+ {g:"set",k:"cpaShow",     l:"CPA Call Show",      t:"calc",f:"eur2",c:d=>div(d.spesa,d.show)},
+
+ {g:"clo",k:"inTarget",    l:"Call in target",     t:"in",  f:"int"},
+ {g:"clo",k:"pctTarget",   l:"% in target",        t:"calc",f:"pct",c:d=>div(d.inTarget,d.show)},
+ {g:"clo",k:"offerte",     l:"Offerte presentate", t:"in",  f:"int"},
+ {g:"clo",k:"pctOfferta",  l:"% Offerta su show",  t:"calc",f:"pct",c:d=>div(d.offerte,d.show)},
+ {g:"clo",k:"vendite",     l:"VENDITE",            t:"in",  f:"int", key:true},
+ {g:"clo",k:"crShow",      l:"Close Rate su SHOW", t:"calc",f:"pct",c:d=>div(d.vendite,d.show)},
+ {g:"clo",k:"crOfferte",   l:"Close Rate su offerte",t:"calc",f:"pct",c:d=>div(d.vendite,d.offerte)},
+ {g:"clo",k:"crFissate",   l:"Close Rate su fissate",t:"calc",f:"pct",c:d=>div(d.vendite,d.fissate)},
+ {g:"clo",k:"leadVendita", l:"LEAD → VENDITA %",   t:"calc",f:"pct",c:d=>div(d.vendite,d.lead)},
+
+ {g:"eco",k:"venduto",     l:"Venduto € (contratti)",t:"in",f:"eur"},
+ {g:"eco",k:"cash",        l:"CASH COLLECTED €",   t:"in",  f:"eur"},
+ {g:"eco",k:"pctCash",     l:"% Cash su venduto",  t:"calc",f:"pct",c:d=>div(d.cash,d.venduto)},
+ {g:"eco",k:"ticket",      l:"Ticket medio",       t:"calc",f:"eur",c:d=>div(d.venduto,d.vendite)},
+ {g:"eco",k:"cashMedio",   l:"Cash medio / vendita",t:"calc",f:"eur",c:d=>div(d.cash,d.vendite)},
+ {g:"eco",k:"refund",      l:"Refund / Chargeback €",t:"in", f:"eur"},
+ {g:"eco",k:"cac",         l:"CAC",                t:"calc",f:"eur",c:d=>div(d.spesa,d.vendite), tgt:"cac"},
+ {g:"eco",k:"roasVenduto", l:"ROAS su venduto",    t:"calc",f:"x", c:d=>div(d.venduto,d.spesa)},
+ {g:"eco",k:"roasCash",    l:"ROAS su CASH",       t:"calc",f:"x", c:d=>div(d.cash,d.spesa), tgt:"roas"},
+ {g:"eco",k:"commissioni", l:"Commissioni team €", t:"calc",f:"eur",c:(d,P)=>d.cash*(P.closer+P.setter)+d.show*P.bonusShow},
+ {g:"eco",k:"profitto",    l:"PROFITTO €",         t:"calc",f:"eur",c:(d,P)=>(d.cash-d.refund)-d.spesa-(d.cash*(P.closer+P.setter)+d.show*P.bonusShow)},
+ {g:"eco",k:"margine",     l:"Margine %",          t:"calc",f:"pct",c:(d,P)=>div((d.cash-d.refund)-d.spesa-(d.cash*(P.closer+P.setter)+d.show*P.bonusShow),d.cash)},
+ {g:"eco",k:"epl",         l:"EPL (cash/lead)",    t:"calc",f:"eur2",c:d=>div(d.cash,d.lead)},
+ {g:"eco",k:"valShow",     l:"Valore / call show", t:"calc",f:"eur2",c:d=>div(d.cash,d.show)},
+ {g:"eco",k:"mer",         l:"MER (spesa/cash)",   t:"calc",f:"n2",c:d=>div(d.spesa,d.cash)}
+];
+const IN_COLS = COLS.filter(c=>c.t==="in").map(c=>c.k);
+const GROUPS = {ana:"Anagrafica", adv:"Advertising · Meta", set:"Setting · dal lead all'appuntamento",
+                clo:"Closing · dalla call alla vendita", eco:"Economics"};
+
+/* ---------- parametri (foglio PARAMETRI) ---------- */
+const P_DEF = {closer:.10, setter:.03, bonusShow:5, fissi:2000, ticketTarget:2000,
+               roasScala:3, spesaMin:150, cpl:12, cac:400};
+const P_META = [
+ {k:"closer",     l:"Commissione closer (% sul cash incassato)", f:"pct", n:"Se paghi a fisso metti 0 e usa i costi fissi."},
+ {k:"setter",     l:"Commissione setter (% sul cash incassato)", f:"pct", n:"Parte variabile del setter."},
+ {k:"bonusShow",  l:"Bonus setter per call SHOW (€)",  f:"eur", n:"Premia lo show, non l'appuntamento: evita agende gonfiate."},
+ {k:"fissi",      l:"Costi fissi mensili (tool, stipendi, editor…)", f:"eur", n:"Restano fuori dal profitto di riga: sono di struttura, non di creativa."},
+ {k:"ticketTarget",l:"Ticket medio target (€)", f:"eur", n:"Prezzo pieno di listino."},
+ {k:"roasScala",  l:"ROAS obiettivo per SCALARE", f:"n2", n:"Sopra questa soglia si alza il budget."},
+ {k:"spesaMin",   l:"Spesa minima per giudicare una creativa (€)", f:"eur", n:"Sotto: dati insufficienti, non si decide."},
+ {k:"cpl",        l:"CPL target (€)", f:"eur", n:"Obiettivo costo per lead."},
+ {k:"cac",        l:"CAC target (€)", f:"eur", n:"Obiettivo costo acquisizione cliente."}
+];
+const margineContributivo = P => 1-P.closer-P.setter;
+const roasPareggio = P => div(1, margineContributivo(P));
+
+/* ---------- formattazione ---------- */
+const nf = (v,d=0)=> new Intl.NumberFormat("it-IT",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v||0);
+function fmt(v,f){
+  if(v===null||v===undefined||!isFinite(v)) v=0;
+  switch(f){
+    case "eur":  return "€ "+nf(v,0);
+    case "eur2": return "€ "+nf(v,2);
+    case "pct":  return nf(v*100,1)+"%";
+    case "x":    return nf(v,2)+"x";
+    case "n1":   return nf(v,1);
+    case "n2":   return nf(v,2);
+    default:     return nf(v,0);
+  }
+}
+const fmtK = v => Math.abs(v)>=1000 ? nf(v/1000,1)+"k" : nf(v,0);
+
+/* ---------- riga vuota / calcolo / somma ---------- */
+const emptyRow = () => { const o={}; IN_COLS.forEach(k=>o[k]=0); return o; };
+
+function compute(d,P){
+  const r = Object.assign({},d);
+  COLS.forEach(c=>{ if(c.t==="calc") r[c.k]=c.c(r,P); });
+  r.verdetto = verdict(r,P);
+  return r;
+}
+function verdict(r,P){
+  if(!r.spesa) return "—";
+  if(r.spesa < P.spesaMin) return "DATI INSUFFICIENTI";
+  if(r.roasCash >= P.roasScala) return "SCALA";
+  if(r.roasCash >= roasPareggio(P)) return "MANTIENI";
+  return "KILL";
+}
+/* somma come SUBTOTAL(109): tutti i campi grezzi si sommano, i tassi si ricalcolano sui totali */
+function sumRows(rows){
+  const o = emptyRow();
+  rows.forEach(r=>{ IN_COLS.forEach(k=>{ o[k]+=(+r[k]||0); }); });
+  return o;
+}
+const chipClass = v => v==="SCALA"?"scala":v==="MANTIENI"?"mantieni":v==="KILL"?"kill":"dati";
+/* ============================================================
+   STATO v3 · dato grezzo sul GIORNO DI CALENDARIO (chiave ISO
+   "2026-08-03"). Le settimane di ogni mese si calcolano dal
+   calendario vero: 4, 5 o 6 a seconda del mese.
+   ============================================================ */
+let state = { params:Object.assign({},P_DEF), mese:"2026-08", campagne:[] };
+let filtroWk = "ALL";                 // "ALL" oppure indice settimana (stringa)
+let sel = {type:"tot", id:"TOT"};
+let openBoxes = new Set(), openWeeks = new Set(), openCr = new Set();
+let visG = {adv:true, set:true, clo:true, eco:true};
+
+const uid = p => p+"_"+Math.random().toString(36).slice(2,8);
+const KEY = "kpi_freedom_v3";
+
+/* ---------- calendario ---------- */
+const MESI = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+const GG = ["Dom","Lun","Mar","Mer","Gio","Ven","Sab"];
+const pad2 = n => String(n).padStart(2,"0");
+const meseLabel = m => { const [y,mm]=m.split("-"); return MESI[+mm-1]+" "+y; };
+function dayLabel(iso){ const [y,m,d]=iso.split("-").map(Number);
+  return GG[new Date(y,m-1,d).getDay()]+" "+d; }
+
+/* settimane reali del mese: da lunedì a domenica, spezzate ai bordi del mese */
+function calWeeks(mese){
+  const [y,m] = mese.split("-").map(Number);
+  const last = new Date(y,m,0).getDate();
+  const weeks=[]; let cur=[];
+  for(let d=1; d<=last; d++){
+    cur.push(`${y}-${pad2(m)}-${pad2(d)}`);
+    if(new Date(y,m-1,d).getDay()===0 || d===last){ weeks.push(cur); cur=[]; }
+  }
+  return weeks.map((days,i)=>({
+    idx:i, label:"Settimana "+(i+1),
+    sub: days.length===1 ? days[0].slice(8)*1+"" : (+days[0].slice(8))+"–"+(+days[days.length-1].slice(8)),
+    days
+  }));
+}
+let WKS = calWeeks(state.mese);   // ricalcolate a ogni cambio mese
+
+function daysOfPeriodo(){
+  if(filtroWk==="ALL") return WKS.flatMap(w=>w.days);
+  const w = WKS[+filtroWk];
+  return w ? w.days : WKS.flatMap(x=>x.days);
+}
+
+/* ---------- salvataggio ---------- */
+function load(){
+  try{ const v = localStorage.getItem(KEY);
+       if(v){ state = JSON.parse(v); return true; } }
+  catch(e){ /* primo avvio */ }
+  return false;
+}
+let saveTimer=null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{
+    try{ localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch(e){ console.warn("Salvataggio non riuscito:",e); }
+  },400);
+}
+
+/* ---------- costruttori ---------- */
+const newCreativa = (nome,angolo,formato)=>({id:uid("cr"), nome:nome||"Nuova inserzione", angolo:angolo||"", formato:formato||"", dati:{}});
+const newAdset    = (nome,cr)=>({id:uid("as"), nome:nome||"Nuovo AdSet", creative:cr||[newCreativa()]});
+const newCampagna = (nome,as)=>({id:uid("cp"), nome:nome||"Nuova campagna", adset:as||[newAdset()]});
+
+/* ---------- accesso ai dati ---------- */
+function cell(cr,iso){ if(!cr.dati[iso]) cr.dati[iso]=emptyRow(); return cr.dati[iso]; }
+const crsOfAdset    = as => as.creative;
+const crsOfCampagna = cp => cp.adset.flatMap(as=>as.creative);
+const crsAll        = () => state.campagne.flatMap(crsOfCampagna);
+const rowsFrom = (crs,days) => crs.flatMap(cr=>days.map(d=>cell(cr,d)));
+const agg = rows => compute(sumRows(rows), state.params);
+
+function findCr(id){ for(const cp of state.campagne) for(const as of cp.adset){
+  const cr = as.creative.find(x=>x.id===id); if(cr) return {cr,as,cp}; } return null; }
+const findAs = id => { for(const cp of state.campagne){ const as=cp.adset.find(x=>x.id===id); if(as) return {as,cp}; } return null; };
+const findCp = id => state.campagne.find(c=>c.id===id);
+
+function wipe(){
+  state.campagne=[];
+  openBoxes=new Set();
+  sel={type:"tot",id:"TOT"};
+}
+/* ============================================================
+   RENDER v3
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const visCols = () => COLS.filter(c=>visG[c.g]);
+
+function spine(r){
+  const base=r.lead||0;
+  const segs=[
+    {c:"s1",l:"Lead",v:r.lead,r:null},
+    {c:"s2",l:"Fissate",v:r.fissate,r:div(r.fissate,r.assegnati)},
+    {c:"s3",l:"Show",v:r.show,r:div(r.show,r.fissate)},
+    {c:"s4",l:"Vendite",v:r.vendite,r:div(r.vendite,r.show)}];
+  return `<div class="spine" aria-hidden="true">`+segs.map(s=>{
+    const w=base?Math.max(3,Math.min(100,s.v/base*100)):0;
+    return `<div class="seg ${s.c}"><span class="fill" style="width:${w}%"></span>
+      <span class="l1"><span class="sl">${s.l}</span>${s.r!==null?`<span class="sr">${nf(s.r*100,0)}%</span>`:""}</span>
+      <span class="sv">${nf(s.v,0)}</span></div>`;}).join("")+`</div>`;
+}
+
+function renderTop(){
+  $("#subline").textContent =
+    `${meseLabel(state.mese)} · ${WKS.length} settimane · ${state.campagne.length} campagne · ${state.campagne.reduce((a,c)=>a+c.adset.reduce((b,s)=>b+s.creative.length,0),0)} inserzioni`;
+  const wkSel = $("#wk");
+  const cur = filtroWk;
+  wkSel.innerHTML = `<option value="ALL">Tutto il mese</option>` +
+    WKS.map(w=>`<option value="${w.idx}">${w.label} · ${w.sub}</option>`).join("");
+  wkSel.value = (cur!=="ALL" && +cur<WKS.length) ? cur : "ALL";
+  filtroWk = wkSel.value;
+  $("#mese").value = state.mese;
+}
+
+/* ---------- menu a sinistra ---------- */
+const boxStats = r => `<div class="bs"><span>Spesa <b>${fmt(r.spesa,"eur")}</b></span><span>ROAS <b>${fmt(r.roasCash,"x")}</b></span></div>`;
+function renderSide(){
+  const days = daysOfPeriodo();
+  const rt = agg(rowsFrom(crsAll(),days));
+  let h = `<div class="sidehead">Campagne · ${esc(meseLabel(state.mese))}</div>
+  <button class="box total v-${chipClass(rt.verdetto)} ${sel.type==="tot"?"on":""}" data-sel="tot" data-id="TOT">
+    <div class="bt"><span>Riepilogo</span><span class="chip sm ${chipClass(rt.verdetto)}">${rt.verdetto}</span></div>
+    <div class="bn">Totale · tutte le campagne</div>${boxStats(rt)}</button>`;
+  state.campagne.forEach((cp,i)=>{
+    const r = agg(rowsFrom(crsOfCampagna(cp),days));
+    const open = openBoxes.has(cp.id);
+    h += `<button class="box v-${chipClass(r.verdetto)} ${sel.type==="campagna"&&sel.id===cp.id?"on":""} ${open?"open":""}"
+        data-sel="campagna" data-id="${cp.id}">
+      <div class="bt"><span>Campagna ${String(i+1).padStart(2,"0")}</span><span class="chip sm ${chipClass(r.verdetto)}">${r.verdetto}</span></div>
+      <div class="bn"><span class="tw">▶</span>${esc(cp.nome)}</div>${boxStats(r)}</button>`;
+    if(open){
+      cp.adset.forEach(as=>{
+        const ra = agg(rowsFrom(crsOfAdset(as),days));
+        h += `<button class="box adset v-${chipClass(ra.verdetto)} ${sel.type==="adset"&&sel.id===as.id?"on":""}"
+            data-sel="adset" data-id="${as.id}">
+          <div class="bt"><span>AdSet</span><span class="chip sm ${chipClass(ra.verdetto)}">${ra.verdetto}</span></div>
+          <div class="bn">${esc(as.nome)}</div>
+          <div class="bs"><span>Spesa <b>${fmt(ra.spesa,"eur")}</b></span><span>${as.creative.length} inserzioni</span></div></button>`;
+      });
+      h += `<button class="addbtn sm" data-addas="${cp.id}">+ AdSet in questa campagna</button>`;
+    }
+  });
+  h += `<button class="addbtn" id="bAddC">+ Nuova campagna</button>`;
+  $("#side").innerHTML = h;
+}
+
+/* ---------- tabella: intestazioni e celle ---------- */
+function theadHTML(firstLabel){
+  const cols = visCols();
+  let g1 = `<tr class="grouprow"><th class="sticky g-ana">${esc(firstLabel)}</th>`;
+  let run=null,count=0;
+  cols.forEach(c=>{ if(c.g!==run){ if(run) g1+=`<th class="g-${run}" colspan="${count}">${GROUPS[run]}</th>`; run=c.g; count=0;} count++; });
+  if(run) g1 += `<th class="g-${run}" colspan="${count}">${GROUPS[run]}</th>`;
+  g1 += `<th class="g-eco">Verdetto</th></tr>`;
+  const g2 = `<tr><th class="sticky"></th>`+cols.map(c=>
+    `<th class="g-${c.g}" title="${c.t==="in"?"da compilare":"formula"}">${esc(c.l)}</th>`).join("")+`<th class="g-eco">Esito</th></tr>`;
+  return `<thead>${g1}${g2}</thead>`;
+}
+function valCell(c,r){
+  const v=r[c.k]||0, P=state.params;
+  let col="";
+  if(r.spesa){
+    if(c.tgt==="cpl")   col=v>0&&v<=P.cpl?"color:var(--ok)":v>P.cpl?"color:var(--bad)":"";
+    if(c.tgt==="cac")   col=v>0&&v<=P.cac?"color:var(--ok)":v>P.cac?"color:var(--bad)":"";
+    if(c.tgt==="speed") col=v>0&&v<=P.speed?"color:var(--ok)":v>P.speed?"color:var(--bad)":"";
+    if(c.tgt==="roas")  col=v>=P.roasScala?"color:var(--ok);font-weight:700":v>=roasPareggio(P)?"color:var(--warn)":"color:var(--bad)";
+  }
+  if(c.k==="profitto"&&v<0) col="color:var(--bad)";
+  return `<td class="val g-${c.g}${v===0?" zero":""}" style="${col}">${fmt(v,c.f)}</td>`;
+}
+const verdCell = r => `<td class="g-eco"><span class="chip sm ${chipClass(r.verdetto)}">${r.verdetto}</span></td>`;
+const dataRow = (first,r,cls)=>`<tr class="${cls||""}"><td class="sticky">${first}</td>${visCols().map(c=>valCell(c,r)).join("")}${verdCell(r)}</tr>`;
+
+/* ---------- FILE KPI: settimane → giorni ---------- */
+function kpiTable(crs){
+  const showWks = filtroWk==="ALL" ? WKS : [WKS[+filtroWk]];
+  let body="";
+  showWks.forEach(w=>{
+    const open=openWeeks.has(w.idx);
+    body += dataRow(`<button class="rowbtn ${open?"open":""}" data-week="${w.idx}">
+        <span class="tw">▶</span><span>${w.label}</span><span class="wksub">${w.sub} ${esc(meseLabel(state.mese).split(" ")[0].toLowerCase().slice(0,3))}</span></button>`,
+      agg(rowsFrom(crs,w.days)), "wkrow");
+    if(open) w.days.forEach(iso=>{
+      body += dataRow(esc(dayLabel(iso)), agg(rowsFrom(crs,[iso])), "dayrow");
+    });
+  });
+  const allDays = showWks.flatMap(w=>w.days);
+  body += dataRow(`<b>Totale / media</b><div class="rowmeta">${showWks.length} settiman${showWks.length===1?"a":"e"} · ${allDays.length} giorni</div>`,
+    agg(rowsFrom(crs,allDays)), "totrow");
+  return `<div class="tscroll"><table>${theadHTML("Periodo")}<tbody>${body}</tbody></table></div>`;
+}
+
+/* ---------- inserzioni dentro un adset ---------- */
+function creativeTable(as){
+  const days = daysOfPeriodo();
+  let body="";
+  as.creative.forEach(cr=>{
+    const open=openCr.has(cr.id);
+    body += dataRow(`<button class="rowbtn ${open?"open":""}" data-cr-tog="${cr.id}"><span class="tw">▶</span>
+        <span>${esc(cr.nome)}</span></button>
+      <div class="rowmeta">${esc([cr.angolo,cr.formato].filter(Boolean).join(" · ")||"—")}
+        <button class="mini" data-editcr="${cr.id}">modifica</button>
+        <button class="mini danger" data-delcr="${cr.id}" data-as="${as.id}">elimina</button></div>`,
+      agg(rowsFrom([cr],days)), "crrow");
+    if(open){
+      if(filtroWk==="ALL"){
+        WKS.forEach(w=> body += dataRow(`${w.label} <span class="wksub">${w.sub}</span>`, agg(rowsFrom([cr],w.days)), "dayrow"));
+      } else {
+        WKS[+filtroWk].days.forEach(iso=>{
+          const raw = cell(cr,iso), rd = compute(raw,state.params);
+          const cells = visCols().map(c=> c.t==="in"
+            ? `<td class="g-${c.g}"><input class="inp" type="number" step="${c.f==="eur"||c.f==="eur2"?"0.01":c.f==="n1"?"0.1":"1"}" min="0"
+                 value="${raw[c.k]||0}" data-cr="${cr.id}" data-iso="${iso}" data-k="${c.k}" aria-label="${esc(dayLabel(iso))} · ${esc(c.l)}"></td>`
+            : valCell(c,rd)).join("");
+          body += `<tr class="dayrow"><td class="sticky">${esc(dayLabel(iso))}</td>${cells}${verdCell(rd)}</tr>`;
+        });
+      }
+    }
+  });
+  body += dataRow(`<b>Totale AdSet</b><div class="rowmeta">${as.creative.length} inserzioni</div>`,
+    agg(rowsFrom(crsOfAdset(as),days)), "totrow");
+  return `<div class="tscroll"><table>${theadHTML("Inserzione / creativa")}<tbody>${body}</tbody></table></div>
+  <div class="hint">${filtroWk==="ALL"
+    ? `Apri un'inserzione per vedere le sue settimane. Per <b>inserire o correggere i numeri</b> scegli una settimana dal menu Periodo: escono i giorni con le celle blu da compilare. La spesa e le metriche Meta puoi anche caricarle in blocco con <b>Importa da Meta</b>.`
+    : `Apri un'inserzione: dentro trovi i giorni di questa settimana. Le celle blu sono le uniche da riempire, tutto il resto si ricalcola da solo e sale su AdSet, campagna e totale.`}</div>
+  <div class="addbar"><button class="mini" data-addcr="${as.id}">+ Aggiungi inserzione</button></div>`;
+}
+
+/* ---------- adset dentro una campagna ---------- */
+function adsetTable(cp){
+  const days = daysOfPeriodo();
+  let body = cp.adset.map(as=>
+    dataRow(`<button class="rowbtn" data-sel="adset" data-id="${as.id}"><span class="tw">▶</span>
+      <span>${esc(as.nome)}</span></button><div class="rowmeta">${as.creative.length} inserzioni · apri per il dettaglio</div>`,
+      agg(rowsFrom(crsOfAdset(as),days)), "crrow")).join("");
+  body += dataRow(`<b>Totale campagna</b><div class="rowmeta">${cp.adset.length} adset</div>`,
+    agg(rowsFrom(crsOfCampagna(cp),days)), "totrow");
+  return `<div class="tscroll"><table>${theadHTML("AdSet")}<tbody>${body}</tbody></table></div>`;
+}
+
+const secbar = title => `<div class="secbar"><span class="t">${esc(title)}</span>
+  ${Object.entries(GROUPS).filter(([k])=>k!=="ana").map(([k,v])=>
+    `<button class="tog" data-g="${k}" aria-pressed="${visG[k]}">${v.split(" ·")[0]}</button>`).join("")}</div>`;
+
+/* ---------- pannello ---------- */
+function phead(eyebrow,titleHTML,meta,r){
+  return `<div class="phead">
+    <div style="min-width:260px">
+      <div class="peyebrow">${esc(eyebrow)}</div>${titleHTML}
+      <div class="pmeta">${esc(meta)}</div>
+    </div>
+    ${spine(r)}
+    <span class="chip ${chipClass(r.verdetto)}">${r.verdetto}</span>
+  </div>`;
+}
+const titleInput = (id,val,kind)=>`<input class="ptitle" value="${esc(val)}" data-ren="${id}" data-kind="${kind}" aria-label="Nome ${kind}">`;
+
+function renderPanel(){
+  const days = daysOfPeriodo();
+  const periodo = filtroWk==="ALL" ? meseLabel(state.mese) : WKS[+filtroWk].label+" · "+WKS[+filtroWk].sub;
+  let h="";
+  if(sel.type==="tot"){
+    const crs=crsAll(), r=agg(rowsFrom(crs,days));
+    h = phead("Riepilogo · "+periodo, `<div class="ptitle" style="border:none">Totale · tutte le campagne</div>`,
+        `${state.campagne.length} campagne attive · ${crs.length} inserzioni`, r)
+      + secbar("File KPI · settimana per settimana")
+      + kpiTable(crs)
+      + `<div class="hint">Clicca una settimana per aprire i giorni. Costi fissi mensili fuori dal calcolo di riga:
+         <b>${fmt(state.params.fissi,"eur")}</b> · profitto al netto dei fissi <b>${fmt(r.profitto-state.params.fissi,"eur")}</b>.</div>`;
+  } else if(sel.type==="campagna"){
+    const cp=findCp(sel.id);
+    if(!cp){ sel={type:"tot",id:"TOT"}; return renderPanel(); }
+    const r=agg(rowsFrom(crsOfCampagna(cp),days));
+    h = phead("Campagna "+String(state.campagne.indexOf(cp)+1).padStart(2,"0")+" · "+periodo,
+        titleInput(cp.id,cp.nome,"campagna"),
+        `${cp.adset.length} adset · ${crsOfCampagna(cp).length} inserzioni`, r)
+      + secbar("File KPI · campagna intera")
+      + kpiTable(crsOfCampagna(cp))
+      + secbar("AdSet della campagna")
+      + adsetTable(cp)
+      + `<div class="addbar"><button class="mini" data-addas="${cp.id}">+ Aggiungi AdSet</button>
+         <button class="mini danger" data-del="${cp.id}" data-type="campagna">Elimina campagna</button></div>`;
+  } else {
+    const f=findAs(sel.id);
+    if(!f){ sel={type:"tot",id:"TOT"}; return renderPanel(); }
+    const r=agg(rowsFrom(crsOfAdset(f.as),days));
+    h = phead("AdSet · "+periodo, titleInput(f.as.id,f.as.nome,"adset"),
+        `Campagna: ${f.cp.nome} · ${f.as.creative.length} inserzioni`, r)
+      + secbar("File KPI · AdSet")
+      + kpiTable(crsOfAdset(f.as))
+      + secbar("Inserzioni dentro l'AdSet")
+      + creativeTable(f.as)
+      + `<div class="addbar"><button class="mini danger" data-del="${f.as.id}" data-type="adset">Elimina AdSet</button></div>`;
+  }
+  $("#panel").innerHTML=h;
+}
+function renderFoot(){
+  const P=state.params;
+  $("#foot").innerHTML=`<b>Come si legge.</b> A sinistra ogni rettangolo è una campagna del mese scelto: cliccala e a destra esce il suo file KPI con gli AdSet; clicca un AdSet e vedi ogni inserzione. Le settimane seguono il calendario vero del mese (${WKS.length} in ${esc(meseLabel(state.mese))}) e ognuna si apre sui suoi giorni. I numeri salgono da soli: giorno → inserzione → AdSet → campagna → totale; le percentuali sono ricalcolate sui totali, mai medie di medie.<br>
+  <b>Verdetto.</b> Sotto ${fmt(P.spesaMin,"eur")} di spesa non si decide. ROAS cash ≥ ${fmt(P.roasScala,"x")} → SCALA · ≥ ${fmt(roasPareggio(P),"x")} (pareggio) → MANTIENI · sotto → KILL.`;
+}
+function render(){ renderTop(); renderSide(); renderPanel(); renderFoot(); }
+/* ============================================================
+   INTERAZIONI v3
+   ============================================================ */
+document.addEventListener("click", e=>{
+  const t=e.target;
+  if(t.closest("input.ptitle")||t.closest("input.inp")) return;
+
+  const tog=t.closest(".tog");
+  if(tog){ visG[tog.dataset.g]=!visG[tog.dataset.g]; renderPanel(); return; }
+
+  const wk=t.closest("[data-week]");
+  if(wk){ const i=+wk.dataset.week; openWeeks.has(i)?openWeeks.delete(i):openWeeks.add(i); renderPanel(); return; }
+
+  const ct=t.closest("[data-cr-tog]");
+  if(ct){ const id=ct.dataset.crTog; openCr.has(id)?openCr.delete(id):openCr.add(id); renderPanel(); return; }
+
+  const ec=t.closest("[data-editcr]"); if(ec){ openEditCr(ec.dataset.editcr); return; }
+
+  const dc=t.closest("[data-delcr]");
+  if(dc){
+    if(dc.dataset.armed!=="1"){ dc.dataset.armed="1"; dc.textContent="confermi?";
+      setTimeout(()=>{ if(dc.isConnected){dc.dataset.armed="0"; dc.textContent="elimina";} },3500); return; }
+    const f=findAs(dc.dataset.as);
+    if(f){ f.as.creative=f.as.creative.filter(x=>x.id!==dc.dataset.delcr);
+           if(!f.as.creative.length) f.as.creative.push(newCreativa()); }
+    save(); render(); return;
+  }
+  const ac=t.closest("[data-addcr]");
+  if(ac){ const f=findAs(ac.dataset.addcr);
+    if(f){ const cr=newCreativa("Inserzione "+(f.as.creative.length+1)); f.as.creative.push(cr); openCr.add(cr.id); save(); render(); } return; }
+
+  const aa=t.closest("[data-addas]");
+  if(aa){ const cp=findCp(aa.dataset.addas);
+    if(cp){ const as=newAdset("AdSet "+(cp.adset.length+1)); cp.adset.push(as);
+            openBoxes.add(cp.id); sel={type:"adset",id:as.id}; save(); render(); } return; }
+
+  if(t.closest("#bAddC")){
+    const cp=newCampagna("Campagna "+(state.campagne.length+1));
+    state.campagne.push(cp); openBoxes.add(cp.id); sel={type:"campagna",id:cp.id}; save(); render(); return;
+  }
+  const del=t.closest("[data-del]");
+  if(del){
+    if(del.dataset.armed!=="1"){ del.dataset.armed="1"; del.textContent="Confermi? Clicca di nuovo";
+      setTimeout(()=>{ if(del.isConnected){del.dataset.armed="0"; del.textContent="Elimina "+del.dataset.type;} },3500); return; }
+    const id=del.dataset.del;
+    if(del.dataset.type==="campagna"){ state.campagne=state.campagne.filter(c=>c.id!==id); sel={type:"tot",id:"TOT"}; }
+    else { const f=findAs(id); if(f){ f.cp.adset=f.cp.adset.filter(a=>a.id!==id); sel={type:"campagna",id:f.cp.id}; } }
+    if(!state.campagne.length) wipe();
+    save(); render(); return;
+  }
+  const s=t.closest("[data-sel]");
+  if(s){
+    const type=s.dataset.sel, id=s.dataset.id;
+    if(type==="campagna"){
+      if(sel.type==="campagna"&&sel.id===id) openBoxes.has(id)?openBoxes.delete(id):openBoxes.add(id);
+      else openBoxes.add(id);
+    }
+    if(type==="adset"){ const f=findAs(id); if(f) openBoxes.add(f.cp.id); }
+    sel={type,id}; render();
+    if(window.innerWidth<=1150) $("#panel").scrollIntoView({behavior:"smooth",block:"start"});
+    return;
+  }
+});
+
+document.addEventListener("input", e=>{
+  const el=e.target;
+  if(el.dataset.k && el.dataset.iso){
+    const f=findCr(el.dataset.cr); if(!f) return;
+    cell(f.cr, el.dataset.iso)[el.dataset.k]=parseFloat(el.value)||0;
+    save(); liveRefresh();
+  } else if(el.dataset.ren){
+    const id=el.dataset.ren, cp=findCp(id);
+    if(cp) cp.nome=el.value; else { const f=findAs(id); if(f) f.as.nome=el.value; }
+    save(); clearTimeout(sideTimer); sideTimer=setTimeout(renderSide,400);
+  }
+});
+let sideTimer=null, liveTimer=null;
+function liveRefresh(){
+  clearTimeout(liveTimer);
+  liveTimer=setTimeout(()=>{
+    const a=document.activeElement;
+    const sig=a&&a.dataset&&a.dataset.k?{cr:a.dataset.cr,iso:a.dataset.iso,k:a.dataset.k,pos:a.selectionStart}:null;
+    render();
+    if(sig){
+      const back=document.querySelector(`input[data-cr="${sig.cr}"][data-iso="${sig.iso}"][data-k="${sig.k}"]`);
+      if(back){ back.focus(); try{ back.setSelectionRange(sig.pos,sig.pos); }catch(_){} }
+    }
+  },600);
+}
+
+/* ---------- mese e periodo ---------- */
+$("#mese").addEventListener("change", e=>{
+  if(!e.target.value) return;
+  state.mese=e.target.value; WKS=calWeeks(state.mese);
+  filtroWk="ALL"; openWeeks=new Set();
+  save(); render();
+});
+$("#wk").addEventListener("change", e=>{
+  filtroWk=e.target.value;
+  if(filtroWk!=="ALL") openWeeks=new Set([+filtroWk]);
+  render();
+});
+
+/* ---------- modali ---------- */
+function openEditCr(id){
+  const f=findCr(id); if(!f) return;
+  $("#pTitle").textContent="Inserzione · "+f.cr.nome;
+  $("#paramBody").innerHTML=`
+    <div class="prow"><div class="pl">Nome inserzione</div>
+      <input type="text" id="cNome" style="width:240px;text-align:left;font-family:var(--sans);color:var(--ink);background:var(--surface-2)" value="${esc(f.cr.nome)}"></div>
+    <div class="prow"><div class="pl">Angolo / Hook</div>
+      <select id="cAng" style="width:240px"><option value="">—</option>${ANGOLI.map(a=>`<option ${a===f.cr.angolo?"selected":""}>${esc(a)}</option>`).join("")}</select></div>
+    <div class="prow" style="border:none"><div class="pl">Formato</div>
+      <select id="cFor" style="width:240px"><option value="">—</option>${FORMATI.map(a=>`<option ${a===f.cr.formato?"selected":""}>${esc(a)}</option>`).join("")}</select></div>`;
+  $("#pSave").dataset.mode="creativa"; $("#pSave").dataset.id=id;
+  $("#ovParam").classList.add("on");
+}
+function openParams(){
+  const P=state.params;
+  $("#pTitle").textContent="Parametri economici e soglie";
+  $("#paramBody").innerHTML=P_META.map(m=>{
+    const v=m.f==="pct"?+(P[m.k]*100).toFixed(2):P[m.k];
+    const step=m.f==="pct"?"0.1":m.f==="n2"?"0.05":m.f==="n1"?"0.5":"1";
+    return `<div class="prow"><div><div class="pl">${esc(m.l)}</div><div class="pn">${esc(m.n)}</div></div>
+      <input type="number" step="${step}" value="${v}" data-p="${m.k}" data-f="${m.f}"></div>`;
+  }).join("")+`
+    <div class="prow"><div><div class="pl">Margine contributivo (1 − commissioni)</div>
+      <div class="pn">Calcolato dalle commissioni qui sopra.</div></div><div class="ro">${fmt(margineContributivo(P),"pct")}</div></div>
+    <div class="prow" style="border:none"><div><div class="pl">ROAS di pareggio (cash / spesa)</div>
+      <div class="pn">Sotto questa soglia ogni euro speso brucia margine.</div></div><div class="ro">${fmt(roasPareggio(P),"x")}</div></div>`;
+  $("#pSave").dataset.mode="param";
+  $("#ovParam").classList.add("on");
+}
+$("#bParam").onclick=openParams;
+$("#pSave").onclick=()=>{
+  const b=$("#pSave");
+  if(b.dataset.mode==="creativa"){
+    const f=findCr(b.dataset.id);
+    if(f){ f.cr.nome=$("#cNome").value||f.cr.nome; f.cr.angolo=$("#cAng").value; f.cr.formato=$("#cFor").value; }
+  } else {
+    document.querySelectorAll("[data-p]").forEach(i=>{
+      const v=parseFloat(i.value)||0;
+      state.params[i.dataset.p]=i.dataset.f==="pct"?v/100:v;
+    });
+  }
+  save(); $("#ovParam").classList.remove("on"); render();
+};
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>b.closest(".ov").classList.remove("on"));
+document.querySelectorAll(".ov").forEach(o=>o.addEventListener("click",ev=>{ if(ev.target===o) o.classList.remove("on"); }));
+$("#bMeta").onclick=()=>{ $("#impMsg").style.display="none"; renderSyncStatus(); $("#ovMeta").classList.add("on"); };
+
+/* ---------- switch fra le due schede del modale ---------- */
+document.querySelectorAll("#metaTabs .tog").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#metaTabs .tog").forEach(x=>x.setAttribute("aria-pressed", x===b));
+  $("#tabAuto").style.display = b.dataset.tab==="auto" ? "" : "none";
+  $("#tabCsv").style.display  = b.dataset.tab==="csv"  ? "" : "none";
+});
+
+/* ============================================================
+   ACCESSO CON PASSWORD + SINCRONIZZAZIONE AUTOMATICA
+   ============================================================ */
+const PW_KEY="kpi_pw";
+const getPw=()=>{ try{return localStorage.getItem(PW_KEY)||"";}catch(e){return "";} };
+const setPw=v=>{ try{localStorage.setItem(PW_KEY,v);}catch(e){} };
+
+function showLogin(err){
+  $("#ovLogin").classList.add("on");
+  $("#pwErr").style.display = err?"block":"none";
+  setTimeout(()=>$("#pwIn").focus(),50);
+}
+async function tryLogin(){
+  const pw=$("#pwIn").value.trim();
+  if(!pw) return;
+  try{
+    const r=await fetch(`/api/ping?key=${encodeURIComponent(pw)}`);
+    if(!r.ok) throw 0;
+    setPw(pw); $("#ovLogin").classList.remove("on");
+    doSync(false);
+  }catch(e){ showLogin(true); }
+}
+$("#bLogin").onclick=tryLogin;
+$("#pwIn").addEventListener("keydown",e=>{ if(e.key==="Enter") tryLogin(); });
+
+/* ---------- fusione payload campagna→adset→inserzione→giorno ---------- */
+function applyImportedCampaigns(campagneIn){
+  const byName=(list,nome,mk)=>{
+    const n=norm(nome);
+    let x=list.find(v=>norm(v.nome)===n);
+    if(!x){ x=mk(nome); list.push(x); }
+    return x;
+  };
+  let nRows=0, minD=null, maxD=null; const mesi=new Set();
+  campagneIn.forEach(cpIn=>{
+    const cp = byName(state.campagne, cpIn.nome, n=>newCampagna(n,[]));
+    cpIn.adset.forEach(asIn=>{
+      const as = byName(cp.adset, asIn.nome, n=>newAdset(n,[]));
+      asIn.creative.forEach(crIn=>{
+        const cr = byName(as.creative, crIn.nome, n=>newCreativa(n));
+        Object.entries(crIn.dati||{}).forEach(([iso,vals])=>{
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return;
+          const d = cell(cr,iso);
+          Object.keys(vals).forEach(k=>{ if(k in d) d[k]=+vals[k]||0; });
+          nRows++; mesi.add(iso.slice(0,7));
+          if(!minD||iso<minD)minD=iso; if(!maxD||iso>maxD)maxD=iso;
+        });
+      });
+    });
+  });
+  state.campagne.forEach(cp=>{ cp.adset=cp.adset.filter(a=>a.creative.length); });
+  state.campagne=state.campagne.filter(c=>c.adset.length);
+  return {nRows,minD,maxD,mesi:[...mesi].sort()};
+}
+
+let syncing=false;
+async function doSync(quiet){
+  const pw=getPw();
+  if(!pw){ showLogin(false); return; }
+  if(syncing) return;
+  syncing=true;
+  const info=$("#syncInfo"); if(!quiet) info.textContent="Aggiornamento in corso…";
+  try{
+    const since = WKS[0].days[0];
+    const until = WKS[WKS.length-1].days[WKS[WKS.length-1].days.length-1];
+    const r = await fetch(`/api/sync?key=${encodeURIComponent(pw)}&since=${since}&until=${until}`);
+    if(r.status===401){ setPw(""); showLogin(true); syncing=false; return; }
+    const j = await r.json();
+    if(!r.ok || j.ok===false) throw new Error(j.error||("HTTP "+r.status));
+    applyImportedCampaigns(j.campagne||[]);
+    state.lastSync = new Date().toISOString();
+    state.lastWarn = j.warn||[];
+    save(); render();
+    info.textContent = "Aggiornato alle "+new Date().toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"})
+      + (state.lastWarn.length? " · "+state.lastWarn.length+" avvisi (vedi Sync)":"");
+  }catch(err){
+    info.textContent = "⚠ Aggiornamento non riuscito: "+err.message;
+  }
+  syncing=false; renderSyncStatus();
+}
+function renderSyncStatus(){
+  const box=$("#syncMsg"); if(!box) return;
+  const t = state.lastSync ? new Date(state.lastSync).toLocaleString("it-IT") : "mai";
+  let msg = "Ultimo aggiornamento: "+t+"\nProssimo automatico entro 15 minuti.";
+  if(state.lastWarn && state.lastWarn.length) msg += "\n\nAvvisi:\n• "+state.lastWarn.join("\n• ");
+  box.style.display="block"; box.textContent=msg;
+}
+$("#bNow").onclick=()=>doSync(false);
+$("#bNow2").onclick=()=>doSync(false);
+setInterval(()=>{ if(getPw()) doSync(true); }, 15*60*1000);
+
+/* ============================================================
+   IMPORT CSV DA META (esportazione giornaliera Gestione inserzioni)
+   ============================================================ */
+function parseCSV(text){
+  /* separatore rilevato dalla prima riga: gli export italiani usano ";"
+     e la virgola come decimale, quelli inglesi usano "," */
+  const firstNL = text.indexOf("\n");
+  const head1 = firstNL>0 ? text.slice(0,firstNL) : text;
+  const sep = (head1.match(/;/g)||[]).length >= (head1.match(/,/g)||[]).length ? ";" : ",";
+  const rows=[]; let row=[], cur="", q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else if(ch==='"') q=true;
+    else if(ch==='\n'||ch==='\r'){ if(cur!==""||row.length){row.push(cur);rows.push(row);row=[];cur="";} if(ch==='\r'&&text[i+1]==='\n')i++; }
+    else if(ch===sep){ row.push(cur); cur=""; }
+    else cur+=ch;
+  }
+  if(cur!==""||row.length){row.push(cur);rows.push(row);}
+  return rows.filter(r=>r.length>1);
+}
+const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+function metaNum(s){
+  s=String(s||"").replace(/[€$\s]/g,"");
+  if(/,\d+$/.test(s)) s=s.replace(/\./g,"").replace(",",".");        // 1.234,56 → 1234.56
+  else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,"");       // 10.500 → 10500 (migliaia IT)
+  else s=s.replace(/,/g,"");                                          // 1,234.56 → 1234.56
+  const v=parseFloat(s); return isFinite(v)?v:0;
+}
+function metaDate(s){
+  s=String(s||"").trim();
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+"-"+m[2]+"-"+m[3];
+  m=s.match(/^(\d{1,2})[\/.](\d{1,2})[\/.](\d{4})/); if(m) return m[3]+"-"+pad2(+m[2])+"-"+pad2(+m[1]);
+  return null;
+}
+/* mappa intestazioni Meta (IT/EN) → campi della dashboard */
+const META_MAP=[
+  {k:"_cp",  m:["nome della campagna","campaign name"]},
+  {k:"_as",  m:["nome del gruppo di inserzioni","ad set name","adset name"]},
+  {k:"_ad",  m:["nome dell'inserzione","nome dellinserzione","ad name"]},
+  {k:"_day", m:["giorno","day","inizio dei rapporti","reporting starts"]},
+  {k:"spesa",m:["importo speso","amount spent"]},
+  {k:"impressions",m:["impressioni","impressions"]},
+  {k:"reach",m:["copertura","reach"]},
+  {k:"click",m:["clic sul link","link clicks"]},
+  {k:"visiteVsl",m:["visualizzazioni della pagina di destinazione","landing page views"]},
+  {k:"video25",m:["riproduzioni video al 25%","video plays at 25%"]},
+  {k:"video50",m:["riproduzioni video al 50%","video plays at 50%"]},
+  {k:"video75",m:["riproduzioni video al 75%","video plays at 75%"]},
+  {k:"video100",m:["riproduzioni video al 100%","video plays at 100%"]},
+  {k:"thruplay",m:["thruplay","thruplays"]},
+  {k:"lead",m:["lead","leads"]},
+  /* campi facoltativi con le intestazioni della dashboard (per CSV dal CRM) */
+  ...COLS.filter(c=>c.t==="in").map(c=>({k:c.k, m:[norm(c.l)]}))
+];
+function importMeta(text){
+  const rows=parseCSV(text);
+  if(rows.length<2) return {err:"File vuoto o non leggibile."};
+  const head=rows[0].map(norm);
+  const idx={};
+  META_MAP.forEach(mm=>{
+    if(idx[mm.k]!==undefined) return;
+    const i=head.findIndex(h=>mm.m.some(m=>h===m||h.startsWith(m)));
+    if(i>=0) idx[mm.k]=i;
+  });
+  if(idx._ad===undefined||idx._day===undefined)
+    return {err:"Nel file mancano le colonne del nome inserzione o del giorno.\nEsporta a livello Inserzioni con suddivisione per Giorno."};
+  const byName=(list,nome,mk)=>{
+    const n=norm(nome);
+    let x=list.find(v=>norm(v.nome)===n);
+    if(!x){ x=mk(nome); list.push(x); }
+    return x;
+  };
+  const touched=new Set(); const mesi=new Set();
+  let nRows=0, minD=null, maxD=null;
+  for(let r=1;r<rows.length;r++){
+    const row=rows[r];
+    const iso=metaDate(row[idx._day]); if(!iso) continue;
+    const cpN=idx._cp!==undefined?row[idx._cp]:"Campagna importata";
+    const asN=idx._as!==undefined?row[idx._as]:"AdSet importato";
+    const adN=row[idx._ad]; if(!adN) continue;
+    const cp=byName(state.campagne,cpN,n=>newCampagna(n,[]));
+    const as=byName(cp.adset,asN,n=>newAdset(n,[]));
+    const cr=byName(as.creative,adN,n=>newCreativa(n));
+    const key=cr.id+"|"+iso;
+    const d=cell(cr,iso);
+    if(!touched.has(key)){ /* azzera solo i campi presenti nel file, poi somma le righe */
+      Object.keys(idx).filter(k=>!k.startsWith("_")).forEach(k=>d[k]=0);
+      touched.add(key);
+    }
+    Object.keys(idx).filter(k=>!k.startsWith("_")).forEach(k=>{ d[k]+=metaNum(row[idx[k]]); });
+    nRows++; mesi.add(iso.slice(0,7));
+    if(!minD||iso<minD)minD=iso; if(!maxD||iso>maxD)maxD=iso;
+  }
+  if(!nRows) return {err:"Nessuna riga con data valida trovata nel file."};
+  /* pulizia adset/campagne rimasti vuoti dalla creazione */
+  state.campagne.forEach(cp=>{ cp.adset=cp.adset.filter(a=>a.creative.length); });
+  state.campagne=state.campagne.filter(c=>c.adset.length);
+  const fields=Object.keys(idx).filter(k=>!k.startsWith("_"));
+  return {ok:true,nRows,minD,maxD,mesi:[...mesi].sort(),fields};
+}
+$("#metaFile").addEventListener("change", e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const res=importMeta(rd.result);
+    const box=$("#impMsg"); box.style.display="block";
+    if(res.err){ box.textContent="⚠ "+res.err; }
+    else{
+      if(res.mesi.length && !res.mesi.includes(state.mese)){ state.mese=res.mesi[res.mesi.length-1]; WKS=calWeeks(state.mese); }
+      save(); render();
+      box.textContent=`✓ Importate ${res.nRows} righe (${res.minD} → ${res.maxD}).\nCampi aggiornati: ${res.fields.join(", ")}.\nMese attivo: ${meseLabel(state.mese)}. Setting e Closing restano da compilare a mano.`;
+    }
+    e.target.value="";
+  };
+  rd.readAsText(f);
+});
+
+/* ---------- esportazione ---------- */
+function csvOut(){
+  const head=["MESE","SETTIMANA","GIORNO","CAMPAGNA","ADSET","INSERZIONE","Angolo / Hook","Formato"]
+    .concat(COLS.map(c=>c.l)).concat(["VERDETTO"]);
+  const lines=[head.join(";")];
+  const wkOf={}; WKS.forEach(w=>w.days.forEach(d=>wkOf[d]=w.label));
+  state.campagne.forEach(cp=>cp.adset.forEach(as=>as.creative.forEach(cr=>{
+    Object.keys(cr.dati).sort().forEach(iso=>{
+      const raw=cr.dati[iso];
+      if(!Object.values(raw).some(v=>v)) return;
+      const r=compute(raw,state.params);
+      lines.push([iso.slice(0,7),wkOf[iso]||"",iso,cp.nome,as.nome,cr.nome,cr.angolo,cr.formato]
+        .concat(COLS.map(c=>String(r[c.k]??0).replace(".",",")))
+        .concat([r.verdetto]).map(v=>`"${String(v).replace(/"/g,'""')}"`).join(";"));
+    });
+  })));
+  return lines.join("\n");
+}
+function download(name,text,mime){
+  try{
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob(["\ufeff"+text],{type:mime}));
+    a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  }catch(err){ $("#jsonBox").value=text; $("#ovJson").classList.add("on"); }
+}
+$("#bExp").onclick=()=>download("KPI_Freedom_University_"+state.mese+".csv", csvOut(), "text/csv;charset=utf-8");
+$("#bJson").onclick=()=>{ $("#jsonBox").value=JSON.stringify(state); $("#ovJson").classList.add("on"); };
+$("#jRestore").onclick=()=>{
+  try{
+    const s=JSON.parse($("#jsonBox").value);
+    if(!s.campagne) throw 0;
+    state=s; state.params=Object.assign({},P_DEF,s.params||{});
+    state.mese=state.mese||"2026-08"; WKS=calWeeks(state.mese);
+    openBoxes=new Set(state.campagne.length?[state.campagne[0].id]:[]); sel={type:"tot",id:"TOT"};
+    save(); render(); $("#ovJson").classList.remove("on");
+  }catch(err){ $("#jsonBox").value="Il testo non è un backup valido: incolla il contenuto completo di un backup precedente.\n\n"+$("#jsonBox").value; }
+};
+$("#jWipe").onclick=()=>{ wipe(); save(); render(); $("#ovJson").classList.remove("on"); };
+
+/* ---------- avvio ---------- */
+(function(){
+  const ok=load();
+  if(!ok||!state.campagne) state.campagne=[];
+  if(state.campagne.length){ openBoxes=new Set([state.campagne[0].id]); }
+  sel={type:"tot",id:"TOT"};
+  state.params=Object.assign({},P_DEF,state.params||{});
+  state.mese=state.mese||new Date().toISOString().slice(0,7);
+  WKS=calWeeks(state.mese);
+  render();
+  if(getPw()) doSync(true); else showLogin(false);
+})();
+
+</script>
+</body>
+</html>
