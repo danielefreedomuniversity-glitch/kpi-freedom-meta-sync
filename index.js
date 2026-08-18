@@ -1,4 +1,3 @@
-Index · JS
 /* ============================================================
    KPI Freedom University — server v2
    ============================================================
@@ -10,7 +9,7 @@ Index · JS
       riprogrammate), e restituisce tutto già fuso nel formato
       campagna -> adset -> inserzione -> giorno
    3. /api/ping: verifica della password
- 
+
    Variabili d'ambiente su Render:
      META_TOKEN, META_AD_ACCOUNT_ID  (già presenti)
      SYNC_API_KEY   = password del sito (es. CollabStore123)
@@ -22,46 +21,46 @@ import cors from "cors";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
- 
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(cors());
 app.use(express.json());
- 
+
 const {
   META_TOKEN, META_AD_ACCOUNT_ID,
   SYNC_API_KEY,
   GHL_TOKEN, GHL_LOCATION_ID,
   PORT = 3000
 } = process.env;
- 
+
 /* ID dei fogli Google (non sono segreti: sono in sola lettura via link) */
 const SHEET_SETTER_ID = "17hr_OMh-5ixP43Wi--OddB3RRQbQqxdgEQzGBEAmHiA";
 const SHEET_CLOSER_ID = "1QHgIzzrLaxPiwgpQlrG68VRx_5SP1WJBlRoFd_Cc2d4";
- 
+
 if (!META_TOKEN || !META_AD_ACCOUNT_ID) {
   console.error("Mancano META_TOKEN o META_AD_ACCOUNT_ID."); process.exit(1);
 }
- 
+
 const GRAPH = "https://graph.facebook.com/v20.0";
 const GHL = "https://services.leadconnectorhq.com";
 const ghlHeaders = { Authorization: `Bearer ${GHL_TOKEN}`, Version: "2021-07-28", Accept: "application/json" };
- 
+
 /* ---------- sito con password ---------- */
 let dashboardHTML = "";
 try { dashboardHTML = readFileSync(join(__dirname, "dashboard.html"), "utf8"); }
 catch { dashboardHTML = "<h1>dashboard.html mancante nel repository</h1>"; }
- 
+
 app.get("/", (_req, res) => res.type("html").send(dashboardHTML));
 app.get("/health", (_req, res) => res.json({ ok: true }));
- 
+
 function checkKey(req, res, next) {
   if (SYNC_API_KEY && req.query.key !== SYNC_API_KEY)
     return res.status(401).json({ ok: false, error: "Password errata." });
   next();
 }
 app.get("/api/ping", checkKey, (_req, res) => res.json({ ok: true }));
- 
+
 /* ============================================================
    1) META — invariato: insight per inserzione, per giorno
    ============================================================ */
@@ -73,7 +72,7 @@ const FIELDS = [
   "video_thruplay_watched_actions"
 ].join(",");
 const actionValue = (a,t)=>{ const h=(Array.isArray(a)?a:[]).find(x=>x.action_type===t); return h?Math.round(parseFloat(h.value)):0; };
- 
+
 async function fetchMeta(since, until) {
   const params = new URLSearchParams({
     level:"ad", time_increment:"1",
@@ -90,7 +89,7 @@ async function fetchMeta(since, until) {
   }
   return rows;
 }
- 
+
 /* ---------- struttura condivisa campagna->adset->inserzione->giorno ---------- */
 function makeShape(){
   const campagne = new Map();
@@ -110,35 +109,35 @@ function makeShape(){
   }));
   return { cell, toArray };
 }
- 
+
 /* ============================================================
    2) GHL — opportunità -> eventi per campagna/adset/creativa/giorno
    ============================================================ */
 const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
 const money = v => { const n=parseFloat(String(v??"").replace(/[€$\s]/g,"").replace(/\.(?=\d{3}\b)/g,"").replace(",",".")); return isFinite(n)?n:0; };
 const dayOf = v => { if(!v) return null; const s=String(v); const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[1]}-${m[2]}-${m[3]}`:null; };
- 
+
 async function ghlGET(path){
   const r = await fetch(GHL+path, {headers: ghlHeaders});
   const j = await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(`GHL ${path}: ${j.message||j.error||r.status}`);
   return j;
 }
- 
+
 async function fetchGHL(since, until, shape, warn){
   if(!GHL_TOKEN || !GHL_LOCATION_ID){ warn.push("GHL non configurato (mancano GHL_TOKEN / GHL_LOCATION_ID)."); return; }
- 
+
   /* mappe: id fase -> nome, id campo -> nome */
   const stages = new Map();   // stageId -> {pipe, stage}
   const pipes = await ghlGET(`/opportunities/pipelines?locationId=${GHL_LOCATION_ID}`);
   (pipes.pipelines||[]).forEach(p=>(p.stages||[]).forEach(s=>stages.set(s.id,{pipe:norm(p.name),stage:norm(s.name)})));
- 
+
   const cf = new Map();       // fieldId -> nome normalizzato
   try{
     const defs = await ghlGET(`/locations/${GHL_LOCATION_ID}/customFields`);
     (defs.customFields||[]).forEach(f=>cf.set(f.id, norm(f.name)));
   }catch(e){ warn.push("Campi personalizzati GHL non leggibili: "+e.message); }
- 
+
   const cfVal = (opp, ...names)=>{
     const arr = opp.customFields||opp.customField||[];
     for(const f of arr){
@@ -147,7 +146,7 @@ async function fetchGHL(since, until, shape, warn){
     }
     return null;
   };
- 
+
   /* tutte le opportunità, paginato */
   let page=1, got=0;
   while(page<=60){
@@ -155,11 +154,11 @@ async function fetchGHL(since, until, shape, warn){
     const list = j.opportunities||[];
     if(!list.length) break;
     got += list.length;
- 
+
     for(const o of list){
       const src = norm(cfVal(o,"utm source") ?? o.source ?? o.contact?.attributionSource?.utmSource ?? "");
       if(!src.includes("facebook")) continue;          // SOLO Facebook, come richiesto
- 
+
       const cp = cfVal(o,"utm campaign") ?? o.contact?.attributionSource?.campaign ?? "— GHL non attribuito";
       const as = cfVal(o,"utm medium")   ?? "—";
       const ad = cfVal(o,"utm content")  ?? "—";
@@ -168,7 +167,7 @@ async function fetchGHL(since, until, shape, warn){
       const changed = dayOf(o.lastStageChangeAt || o.lastStatusChangeAt || o.updatedAt) || created;
       const inRange = d => d && d>=since && d<=until;
       const add=(day,field,n=1)=>{ if(!inRange(day)) return; const c=shape.cell(String(cp).trim(),String(as).trim(),String(ad).trim(),day); c[field]=(c[field]||0)+n; };
- 
+
       if(st.pipe.includes("setter")){
         const s=st.stage;
         const contattato = ["contattato","call 1","call 2","call 3","non interessato","non in target","semina","appuntamento fissato"].some(x=>s.includes(x));
@@ -199,7 +198,7 @@ async function fetchGHL(since, until, shape, warn){
   }
   if(!got) warn.push("GHL: nessuna opportunità ricevuta — controlla token e Location ID.");
 }
- 
+
 /* ============================================================
    3) FOGLIO SETTER (Google Sheets, scheda TEAM)
    solo i campi che GHL non conosce: tentativi, assegnati, riprogrammate
@@ -219,7 +218,7 @@ function parseCSVText(text){
 }
 const itDate = s => { const m=String(s||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m?`${m[3]}-${String(m[2]).padStart(2,"0")}-${String(m[1]).padStart(2,"0")}`:null; };
 const num = s => { const v=parseFloat(String(s??"").replace(/\./g,"").replace(",",".")); return isFinite(v)?v:0; };
- 
+
 async function fetchSetterSheet(since, until, shape, warn){
   try{
     const url=`https://docs.google.com/spreadsheets/d/${SHEET_SETTER_ID}/gviz/tq?tqx=out:csv&sheet=TEAM`;
@@ -245,7 +244,7 @@ async function fetchSetterSheet(since, until, shape, warn){
     if(!n) warn.push("Foglio setter letto ma senza righe compilate nel periodo.");
   }catch(e){ warn.push("Foglio setter non leggibile: "+e.message); }
 }
- 
+
 /* ============================================================
    /api/sync — tutto insieme
    ============================================================ */
@@ -255,7 +254,7 @@ app.get("/api/sync", checkKey, async (req,res)=>{
     const since = req.query.since || new Date(Date.now()-30*864e5).toISOString().slice(0,10);
     const warn = [];
     const shape = makeShape();
- 
+
     /* Meta */
     const metaRows = await fetchMeta(since, until);
     for(const row of metaRows){
@@ -272,16 +271,16 @@ app.get("/api/sync", checkKey, async (req,res)=>{
       d.visiteVsl=(d.visiteVsl||0)+actionValue(row.actions,"landing_page_view");
       d.lead=(d.lead||0)+(actionValue(row.actions,"lead")||actionValue(row.actions,"onsite_conversion.lead_grouped"));
     }
- 
+
     /* GHL + foglio setter (non bloccanti: se falliscono, Meta arriva comunque) */
     try{ await fetchGHL(since, until, shape, warn); }catch(e){ warn.push("GHL: "+e.message); }
     await fetchSetterSheet(since, until, shape, warn);
- 
+
     res.json({ ok:true, since, until, nMeta: metaRows.length, warn, campagne: shape.toArray() });
   }catch(err){
     console.error(err);
     res.status(500).json({ ok:false, error:String(err.message||err) });
   }
 });
- 
+
 app.listen(PORT, ()=>console.log(`KPI server v2 attivo sulla porta ${PORT}`));
