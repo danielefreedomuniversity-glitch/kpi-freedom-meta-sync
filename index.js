@@ -130,6 +130,16 @@ async function ghlGET(path){
   return j;
 }
 
+/* ID dei campi UTM di questa location (dalla diagnosi): funzionano anche senza
+   il permesso "campi personalizzati" sul token. Gli altri campi (Cash, Contrattualizzato,
+   Data Vendita) si risolvono per nome appena il token ha lo scope giusto. */
+const FIELD_FALLBACK = {
+  "eIWChn1tSHr9SV3k8nPg": "utm source",
+  "ngCaDZhKshp4XYiq1Vme": "utm campaign",
+  "bFlpzo17stRQocW1WAEh": "utm medium",
+  "4v33gsK21jenFc8xEyw4": "utm content"
+};
+
 async function fetchGHL(since, until, shape, warn){
   if(!GHL_TOKEN || !GHL_LOCATION_ID){ warn.push("GHL non configurato (mancano GHL_TOKEN / GHL_LOCATION_ID)."); return; }
 
@@ -138,15 +148,16 @@ async function fetchGHL(since, until, shape, warn){
   const pipes = await ghlGET(`/opportunities/pipelines?locationId=${GHL_LOCATION_ID}`);
   (pipes.pipelines||[]).forEach(p=>(p.stages||[]).forEach(s=>stages.set(s.id,{pipe:norm(p.name),stage:norm(s.name)})));
 
-  const cf = new Map();       // fieldId -> nome normalizzato
+  const cf = new Map(Object.entries(FIELD_FALLBACK));   // fieldId -> nome normalizzato
+  let scopeOk=false;
   for(const q of ["?model=all","?model=opportunity",""]){
     try{
       const defs = await ghlGET(`/locations/${GHL_LOCATION_ID}/customFields${q}`);
       (defs.customFields||[]).forEach(f=>cf.set(f.id, norm(f.name)));
-      if(cf.size) break;
+      if(cf.size>Object.keys(FIELD_FALLBACK).length){ scopeOk=true; break; }
     }catch(e){ /* prova la variante successiva */ }
   }
-  if(!cf.size) warn.push("Campi personalizzati GHL non leggibili: UTM e Cash non disponibili.");
+  if(!scopeOk) warn.push("Token GHL senza permesso sui campi personalizzati: gli UTM funzionano lo stesso, ma Cash Collected / Contrattualizzato / Data Vendita no. Aggiungi lo scope \"View Custom Fields\" all'integrazione privata in GHL.");
 
   const cfVal = (opp, ...names)=>{
     const arr = opp.customFields||opp.customField||opp.custom_fields||[];
@@ -164,7 +175,7 @@ async function fetchGHL(since, until, shape, warn){
 
   /* tutte le opportunità, paginato */
   let page=1, got=0;
-  while(page<=60){
+  while(page<=150){
     const j = await ghlGET(`/opportunities/search?location_id=${GHL_LOCATION_ID}&limit=100&page=${page}`);
     const list = j.opportunities||[];
     if(!list.length) break;
@@ -172,15 +183,16 @@ async function fetchGHL(since, until, shape, warn){
 
     for(const o of list){
       nTot++;
-      const src = norm(cfVal(o,"utm source") ?? o.source ?? o.contact?.attributionSource?.utmSource ?? "");
+      const a0 = Array.isArray(o.attributions)&&o.attributions.length ? o.attributions[o.attributions.length-1] : null;
+      const src = norm(cfVal(o,"utm source") ?? a0?.utmSource ?? o.source ?? o.contact?.attributionSource?.utmSource ?? "");
       if(!src.includes("facebook")) continue;          // SOLO Facebook, come richiesto
       nFb++;
 
-      const utmCp = cfVal(o,"utm campaign") ?? o.contact?.attributionSource?.campaign ?? null;
+      const utmCp = cfVal(o,"utm campaign") ?? a0?.utmCampaign ?? a0?.campaign ?? o.contact?.attributionSource?.campaign ?? null;
       if(utmCp) nAttr++; else nNoUtm++;
       const cp = utmCp ?? "— GHL non attribuito";
-      const as = cfVal(o,"utm medium")   ?? "—";
-      const ad = cfVal(o,"utm content")  ?? "—";
+      const as = cfVal(o,"utm medium")   ?? a0?.utmMedium  ?? "—";
+      const ad = cfVal(o,"utm content")  ?? a0?.utmContent ?? "—";
       const st = stages.get(o.pipelineStageId) || {pipe:"",stage:""};
       const created = dayOf(o.createdAt);
       const changed = dayOf(o.lastStageChangeAt || o.lastStatusChangeAt || o.updatedAt) || created;
