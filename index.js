@@ -83,11 +83,11 @@ async function fetchMeta(since, until) {
   const rows=[];
   while(url){
     let j=null;
-    for(let tent=1;tent<=3;tent++){
+    for(let tent=1;tent<=4;tent++){
       j = await (await fetch(url)).json();
       if(!j.error) break;
       /* code 1/2 = errore temporaneo di Meta: aspetta e riprova da solo */
-      if([1,2].includes(j.error.code) && tent<3){ await new Promise(r=>setTimeout(r,2500*tent)); continue; }
+      if([1,2].includes(j.error.code) && tent<4){ await new Promise(r=>setTimeout(r,3000*tent)); continue; }
       throw new Error(`Meta API: ${j.error.message} (code ${j.error.code})`);
     }
     rows.push(...(j.data||[]));
@@ -150,14 +150,19 @@ async function fetchGHL(since, until, shape, warn){
 
   const cf = new Map(Object.entries(FIELD_FALLBACK));   // fieldId -> nome normalizzato
   let scopeOk=false;
-  for(const q of ["?model=all","?model=opportunity",""]){
+  for(const q of ["?model=opportunity","?model=contact","?model=all",""]){
     try{
       const defs = await ghlGET(`/locations/${GHL_LOCATION_ID}/customFields${q}`);
       (defs.customFields||[]).forEach(f=>cf.set(f.id, norm(f.name)));
-      if(cf.size>Object.keys(FIELD_FALLBACK).length){ scopeOk=true; break; }
-    }catch(e){ /* prova la variante successiva */ }
+      scopeOk=true;                                     // continua comunque: unisci tutti gli elenchi
+    }catch(e){ /* variante non disponibile, prova la prossima */ }
   }
   if(!scopeOk) warn.push("Token GHL senza permesso sui campi personalizzati: gli UTM funzionano lo stesso, ma Cash Collected / Contrattualizzato / Data Vendita no. Aggiungi lo scope \"View Custom Fields\" all'integrazione privata in GHL.");
+  else{
+    const trovato = n => [...cf.values()].some(v=>v.includes(n));
+    const mancanti = ["cash collected","contrattualizzato","data vendita"].filter(n=>!trovato(n));
+    if(mancanti.length) warn.push("Campi GHL non trovati per nome: "+mancanti.join(", ")+" — controlla come si chiamano esattamente in GHL (Impostazioni → Campi personalizzati).");
+  }
 
   const cfVal = (opp, ...names)=>{
     const arr = opp.customFields||opp.customField||opp.custom_fields||[];
@@ -331,13 +336,19 @@ app.get("/api/ghl-debug", checkKey, async (_req,res)=>{
     const pipes = await ghlGET(`/opportunities/pipelines?locationId=${GHL_LOCATION_ID}`);
     out.pipelines=(pipes.pipelines||[]).map(p=>({nome:p.name, fasi:(p.stages||[]).map(s=>s.name)}));
   }catch(e){ out.pipelines="ERRORE: "+e.message; }
-  for(const q of ["?model=all","?model=opportunity",""]){
+  const tutti=new Map();
+  for(const q of ["?model=opportunity","?model=contact","?model=all",""]){
     try{
       const defs = await ghlGET(`/locations/${GHL_LOCATION_ID}/customFields${q}`);
-      out["campi"+(q||"?default")]=(defs.customFields||[]).slice(0,60).map(f=>f.name);
-      if((defs.customFields||[]).length) break;
+      (defs.customFields||[]).forEach(f=>tutti.set(f.id,f.name));
+      out["campi"+(q||"?default")]=(defs.customFields||[]).length+" campi";
     }catch(e){ out["campi"+(q||"?default")]="ERRORE: "+e.message; }
   }
+  out.campiChiave={};
+  for(const n of ["cash","contrattualizzato","data vendita","utm campaign","utm source"]){
+    out.campiChiave[n]=[...tutti.values()].filter(v=>String(v).toLowerCase().includes(n));
+  }
+  out.tuttiICampi=[...tutti.values()];
   try{
     const j = await ghlGET(`/opportunities/search?location_id=${GHL_LOCATION_ID}&limit=3&page=1`);
     out.esempioOpportunita=(j.opportunities||[]).map(o=>({
