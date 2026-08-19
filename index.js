@@ -82,8 +82,14 @@ async function fetchMeta(since, until) {
   let url = `${GRAPH}/act_${META_AD_ACCOUNT_ID}/insights?${params}`;
   const rows=[];
   while(url){
-    const j = await (await fetch(url)).json();
-    if (j.error) throw new Error(`Meta API: ${j.error.message} (code ${j.error.code})`);
+    let j=null;
+    for(let tent=1;tent<=3;tent++){
+      j = await (await fetch(url)).json();
+      if(!j.error) break;
+      /* code 1/2 = errore temporaneo di Meta: aspetta e riprova da solo */
+      if([1,2].includes(j.error.code) && tent<3){ await new Promise(r=>setTimeout(r,2500*tent)); continue; }
+      throw new Error(`Meta API: ${j.error.message} (code ${j.error.code})`);
+    }
     rows.push(...(j.data||[]));
     url = j.paging?.next || null;
   }
@@ -133,19 +139,28 @@ async function fetchGHL(since, until, shape, warn){
   (pipes.pipelines||[]).forEach(p=>(p.stages||[]).forEach(s=>stages.set(s.id,{pipe:norm(p.name),stage:norm(s.name)})));
 
   const cf = new Map();       // fieldId -> nome normalizzato
-  try{
-    const defs = await ghlGET(`/locations/${GHL_LOCATION_ID}/customFields`);
-    (defs.customFields||[]).forEach(f=>cf.set(f.id, norm(f.name)));
-  }catch(e){ warn.push("Campi personalizzati GHL non leggibili: "+e.message); }
+  for(const q of ["?model=all","?model=opportunity",""]){
+    try{
+      const defs = await ghlGET(`/locations/${GHL_LOCATION_ID}/customFields${q}`);
+      (defs.customFields||[]).forEach(f=>cf.set(f.id, norm(f.name)));
+      if(cf.size) break;
+    }catch(e){ /* prova la variante successiva */ }
+  }
+  if(!cf.size) warn.push("Campi personalizzati GHL non leggibili: UTM e Cash non disponibili.");
 
   const cfVal = (opp, ...names)=>{
-    const arr = opp.customFields||opp.customField||[];
+    const arr = opp.customFields||opp.customField||opp.custom_fields||[];
     for(const f of arr){
-      const nm = cf.get(f.id)||"";
-      if(names.some(n=>nm.includes(n))) return f.fieldValue ?? f.fieldValueString ?? f.value ?? null;
+      const nm = cf.get(f.id||f.customFieldId)||norm(f.name||f.key||"");
+      if(names.some(n=>nm.includes(n))){
+        const v = f.fieldValue ?? f.fieldValueString ?? f.field_value ?? f.value;
+        if(Array.isArray(v)) return v.join(", ");
+        return v ?? null;
+      }
     }
     return null;
   };
+  let nTot=0, nFb=0, nAttr=0, nNoUtm=0, cashSum=0;
 
   /* tutte le opportunità, paginato */
   let page=1, got=0;
@@ -156,10 +171,14 @@ async function fetchGHL(since, until, shape, warn){
     got += list.length;
 
     for(const o of list){
+      nTot++;
       const src = norm(cfVal(o,"utm source") ?? o.source ?? o.contact?.attributionSource?.utmSource ?? "");
       if(!src.includes("facebook")) continue;          // SOLO Facebook, come richiesto
+      nFb++;
 
-      const cp = cfVal(o,"utm campaign") ?? o.contact?.attributionSource?.campaign ?? "— GHL non attribuito";
+      const utmCp = cfVal(o,"utm campaign") ?? o.contact?.attributionSource?.campaign ?? null;
+      if(utmCp) nAttr++; else nNoUtm++;
+      const cp = utmCp ?? "— GHL non attribuito";
       const as = cfVal(o,"utm medium")   ?? "—";
       const ad = cfVal(o,"utm content")  ?? "—";
       const st = stages.get(o.pipelineStageId) || {pipe:"",stage:""};
@@ -170,8 +189,13 @@ async function fetchGHL(since, until, shape, warn){
 
       if(st.pipe.includes("setter")){
         const s=st.stage;
+        add(created,"assegnati");                     // ogni lead entrato in pipeline = assegnato quel giorno
         const contattato = ["contattato","call 1","call 2","call 3","non interessato","non in target","semina","appuntamento fissato"].some(x=>s.includes(x));
         if(contattato) add(changed,"contattati");
+        /* tentativi: stima dalle fasi CALL (per difetto: gli esiti non ricordano quanti tentativi hanno richiesto) */
+        if(s.includes("call 1")) add(changed,"tentativi",1);
+        else if(s.includes("call 2")) add(changed,"tentativi",2);
+        else if(s.includes("call 3")) add(changed,"tentativi",3);
         if(s.includes("non interessato")) add(changed,"nonInteressato");
         if(s.includes("non in target"))   add(changed,"nonTarget");
         if(s.includes("semina")||s.includes("numero errato")) add(changed,"nonFissati");
@@ -188,6 +212,7 @@ async function fetchGHL(since, until, shape, warn){
           add(saleDay,"vendite");
           const venduto = money(cfVal(o,"contrattualizzato")) || (+o.monetaryValue||0);
           const cash    = money(cfVal(o,"cash collected"));
+          cashSum+=cash;
           if(venduto) add(saleDay,"venduto",venduto);
           if(cash)    add(saleDay,"cash",cash);
         }
@@ -197,6 +222,7 @@ async function fetchGHL(since, until, shape, warn){
     page++;
   }
   if(!got) warn.push("GHL: nessuna opportunità ricevuta — controlla token e Location ID.");
+  else warn.push(`GHL: ${nFb} opportunità Facebook su ${nTot} totali · ${nAttr} attribuite via UTM · ${nNoUtm} senza UTM (finite in "— GHL non attribuito") · cash letto € ${Math.round(cashSum)}.`);
 }
 
 /* ============================================================
@@ -229,19 +255,17 @@ async function fetchSetterSheet(since, until, shape, warn){
     if(hi<0) throw new Error("intestazione 'Data' non trovata nella scheda TEAM");
     const head = rows[hi].map(norm);
     const col = name => head.findIndex(h=>h.includes(name));
-    const cTent=col("tentativi"), cAss=col("lead assegnati"), cRip=col("riprogrammate");
+    const cRip=col("riprogrammate");
     let n=0;
     for(let i=hi+1;i<rows.length;i++){
       const day = itDate(rows[i][0]); if(!day || day<since || day>until) continue;
-      const tent=cTent>=0?num(rows[i][cTent]):0, ass=cAss>=0?num(rows[i][cAss]):0, rip=cRip>=0?num(rows[i][cRip]):0;
-      if(!tent && !ass && !rip) continue;
+      const rip=cRip>=0?num(rows[i][cRip]):0;
+      if(!rip) continue;
       const c = shape.cell("⚙ Team — registro setter","Fogli Google","Attività non attribuita",day);
-      if(tent) c.tentativi=(c.tentativi||0)+tent;
-      if(ass)  c.assegnati=(c.assegnati||0)+ass;
-      if(rip)  c.riprog=(c.riprog||0)+rip;
+      c.riprog=(c.riprog||0)+rip;
       n++;
     }
-    if(!n) warn.push("Foglio setter letto ma senza righe compilate nel periodo.");
+    if(!n) warn.push("Foglio setter: nessuna riga con Riprogrammate nel periodo (assegnati, tentativi e tutto il resto arrivano già da GHL).");
   }catch(e){ warn.push("Foglio setter non leggibile: "+e.message); }
 }
 
@@ -255,8 +279,10 @@ app.get("/api/sync", checkKey, async (req,res)=>{
     const warn = [];
     const shape = makeShape();
 
-    /* Meta */
-    const metaRows = await fetchMeta(since, until);
+    /* Meta (non bloccante: se Meta ha un singhiozzo, GHL e fogli arrivano lo stesso) */
+    let metaRows = [];
+    try{ metaRows = await fetchMeta(since, until); }
+    catch(e){ warn.push("Meta API: "+e.message+" — riprova tra qualche minuto, GHL e fogli sono comunque aggiornati."); }
     for(const row of metaRows){
       const d = shape.cell(row.campaign_name, row.adset_name, row.ad_name, row.date_start);
       d.spesa=(d.spesa||0)+parseFloat(row.spend||0);
@@ -281,6 +307,31 @@ app.get("/api/sync", checkKey, async (req,res)=>{
     console.error(err);
     res.status(500).json({ ok:false, error:String(err.message||err) });
   }
+});
+
+/* ---------- diagnosi GHL: mostra cosa risponde davvero l'API ---------- */
+app.get("/api/ghl-debug", checkKey, async (_req,res)=>{
+  const out={};
+  try{
+    const pipes = await ghlGET(`/opportunities/pipelines?locationId=${GHL_LOCATION_ID}`);
+    out.pipelines=(pipes.pipelines||[]).map(p=>({nome:p.name, fasi:(p.stages||[]).map(s=>s.name)}));
+  }catch(e){ out.pipelines="ERRORE: "+e.message; }
+  for(const q of ["?model=all","?model=opportunity",""]){
+    try{
+      const defs = await ghlGET(`/locations/${GHL_LOCATION_ID}/customFields${q}`);
+      out["campi"+(q||"?default")]=(defs.customFields||[]).slice(0,60).map(f=>f.name);
+      if((defs.customFields||[]).length) break;
+    }catch(e){ out["campi"+(q||"?default")]="ERRORE: "+e.message; }
+  }
+  try{
+    const j = await ghlGET(`/opportunities/search?location_id=${GHL_LOCATION_ID}&limit=3&page=1`);
+    out.esempioOpportunita=(j.opportunities||[]).map(o=>({
+      nome:o.name, fase:o.pipelineStageId, creata:o.createdAt, valore:o.monetaryValue,
+      chiavi:Object.keys(o),
+      customFields:(o.customFields||o.customField||[]).slice(0,25)
+    }));
+  }catch(e){ out.esempioOpportunita="ERRORE: "+e.message; }
+  res.json(out);
 });
 
 app.listen(PORT, ()=>console.log(`KPI server v2 attivo sulla porta ${PORT}`));

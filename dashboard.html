@@ -326,7 +326,7 @@ const COLS = [
  {g:"adv",k:"thruplay",    l:"ThruPlay",           t:"in",  f:"int"},
  {g:"adv",k:"hookRate",    l:"Hook Rate",          t:"calc",f:"pct",c:d=>div(d.video25,d.impressions)},
  {g:"adv",k:"holdRate",    l:"Hold Rate",          t:"calc",f:"pct",c:d=>div(d.video75,d.video25)},
- {g:"adv",k:"cvrLanding",  l:"CVR Landing",        t:"calc",f:"pct",c:d=>div(d.lead,d.visiteVsl)},
+ {g:"adv",k:"cvrLanding",  l:"CVR Landing",        t:"calc",f:"pct",c:d=>(d.visiteVsl>0&&d.lead<=d.visiteVsl?d.lead/d.visiteVsl:0)},
 
  {g:"set",k:"assegnati",   l:"Lead assegnati",     t:"in",  f:"int"},
  {g:"set",k:"tentativi",   l:"Tentativi chiamata", t:"in",  f:"int"},
