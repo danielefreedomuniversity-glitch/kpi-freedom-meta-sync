@@ -173,10 +173,12 @@ async function fetchGHL(since, until, shape, warn){
   };
   let nTot=0, nFb=0, nAttr=0, nNoUtm=0, cashSum=0;
 
-  /* tutte le opportunità, paginato */
-  let page=1, got=0;
-  while(page<=150){
-    const j = await ghlGET(`/opportunities/search?location_id=${GHL_LOCATION_ID}&limit=100&page=${page}`);
+  /* tutte le opportunità, paginazione a cursore (startAfter): regge qualsiasi volume */
+  let got=0, startAfter=null, startAfterId=null, guardia=0;
+  while(guardia++ < 500){
+    let path = `/opportunities/search?location_id=${GHL_LOCATION_ID}&limit=100`;
+    if(startAfterId) path += `&startAfterId=${encodeURIComponent(startAfterId)}&startAfter=${encodeURIComponent(startAfter)}`;
+    const j = await ghlGET(path);
     const list = j.opportunities||[];
     if(!list.length) break;
     got += list.length;
@@ -230,8 +232,9 @@ async function fetchGHL(since, until, shape, warn){
         }
       }
     }
-    if(list.length<100) break;
-    page++;
+    const m=j.meta||{};
+    if(list.length<100 || !m.startAfterId) break;
+    startAfterId=m.startAfterId; startAfter=m.startAfter;
   }
   if(!got) warn.push("GHL: nessuna opportunità ricevuta — controlla token e Location ID.");
   else warn.push(`GHL: ${nFb} opportunità Facebook su ${nTot} totali · ${nAttr} attribuite via UTM · ${nNoUtm} senza UTM (finite in "— GHL non attribuito") · cash letto € ${Math.round(cashSum)}.`);
