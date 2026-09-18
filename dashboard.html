@@ -186,6 +186,21 @@ textarea{width:100%;height:150px;font-family:var(--mono);font-size:11px;padding:
   background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:10px;display:none}
 .foot{padding:18px 2px 0;font-size:11px;color:var(--ink-3);line-height:1.65}
 .foot b{color:var(--ink-2)}
+/* ============================================================
+   SEZIONE REPORT (aggiunta v3.1) — solo stili nuovi, nulla
+   di quanto sopra è stato modificato.
+   ============================================================ */
+.rbtn{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:4px 9px;border-radius:3px;
+  border:1px solid var(--line);background:transparent;cursor:pointer;color:var(--ink-3);font-family:inherit}
+.rbtn:hover{color:var(--ink-2)}
+.rbtn[aria-pressed="true"]{background:var(--eco);color:#0A1020;border-color:transparent;font-weight:800}
+#repPanel select{max-width:230px}
+#repMese{font-size:12px;font-weight:600;color:var(--ink);padding:7px 11px;border:1px solid var(--line);
+  border-radius:4px;background:var(--surface-2)}
+#repCamp label:hover{background:var(--surface-2);border-radius:4px}
+#repText{background:var(--surface-2)}
+@media (max-width:700px){ #repPanel .secbar{gap:6px} #repGen{width:100%;margin-left:0} }
+
 @media (max-width:1150px){
   .layout{grid-template-columns:1fr}
   .side{position:static;max-height:none;display:flex;gap:8px;overflow-x:auto;padding-bottom:6px}
@@ -223,6 +238,44 @@ textarea{width:100%;height:150px;font-family:var(--mono);font-size:11px;padding:
     <aside class="side" id="side"></aside>
     <main class="panel" id="panel"></main>
   </div>
+  <!-- ============================================================
+       SEZIONE REPORT (aggiunta v3.1) — tutto ciò che sta sopra
+       è rimasto invariato. Questa sezione legge soltanto i dati
+       già presenti nella dashboard e non li modifica mai.
+       ============================================================ -->
+  <section class="panel" id="repPanel" style="margin-top:14px">
+    <div class="phead">
+      <div style="min-width:260px">
+        <div class="peyebrow">Report per la direzione</div>
+        <div class="ptitle" style="border:none;margin-left:0;padding-left:0">Report campagne lead</div>
+        <div class="pmeta">Giornaliero, settimanale o mensile · solo campagne con obiettivo lead · pronto da inoltrare</div>
+      </div>
+    </div>
+    <div class="secbar">
+      <span class="t">Periodo</span>
+      <button class="rbtn" data-rt="g" aria-pressed="true">Giornaliero</button>
+      <button class="rbtn" data-rt="s" aria-pressed="false">Settimanale</button>
+      <button class="rbtn" data-rt="m" aria-pressed="false">Mensile</button>
+      <select id="repDay" aria-label="Giorno del report"></select>
+      <select id="repWeek" aria-label="Settimana del report" style="display:none"></select>
+      <span id="repMese" style="display:none"></span>
+      <button class="mini" id="repCampBtn" style="margin-left:auto">Campagne incluse</button>
+      <button class="btn solid" id="repGen">Genera report</button>
+    </div>
+    <div id="repCamp" style="display:none;padding:12px 18px;border-bottom:1px solid var(--line-2);background:var(--surface)"></div>
+    <div id="repOut" style="display:none;padding:14px 18px;background:var(--surface)">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <button class="btn" id="repCopyWa">Copia per WhatsApp</button>
+        <button class="btn" id="repCopyTxt">Copia testo</button>
+        <button class="btn" id="repDl">Scarica .txt</button>
+        <button class="btn" id="repAi">Rifinisci con l'IA</button>
+        <span id="repAiMsg" style="font-size:11px;color:var(--ink-3)"></span>
+      </div>
+      <textarea id="repText" spellcheck="false" style="height:400px;line-height:1.55;font-size:12px" aria-label="Testo del report"></textarea>
+    </div>
+    <div class="hint">Il report legge i numeri già presenti nella dashboard (Meta, GHL e fogli) per il periodo scelto, li confronta con il periodo precedente e aggiunge una lettura pronta da inoltrare. Le campagne incluse sono <b>solo quelle con obiettivo lead</b>: la selezione automatica prende le campagne con lead nel mese ed esclude engagement e voci di servizio, ma puoi correggerla da “Campagne incluse”. Prima di copiare puoi <b>modificare il testo direttamente nel riquadro</b>. “Rifinisci con l'IA” lo riscrive in forma più discorsiva (facoltativo: richiede la chiave IA sul server, vedi istruzioni).</div>
+  </section>
+
   <div class="foot" id="foot"></div>
 </div>
 
@@ -1158,6 +1211,330 @@ $("#jWipe").onclick=()=>{ wipe(); save(); render(); $("#ovJson").classList.remov
   render();
   if(getPw()) doSync(true); else showLogin(false);
 })();
+
+
+/* ============================================================
+   SEZIONE REPORT (aggiunta v3.1)
+   ============================================================
+   Genera un report giornaliero / settimanale / mensile sulle sole
+   campagne con obiettivo lead, pronto da inoltrare al responsabile.
+   NOTA: tutto il codice sopra questa riga è invariato. Questa parte
+   LEGGE soltanto `state` (mai una scrittura sul modello dati) e
+   salva le proprie preferenze in una chiave localStorage separata.
+   ============================================================ */
+const REP_KEY = "kpi_report_cfg_v1";
+function repCfg(){
+  try{
+    const c = JSON.parse(localStorage.getItem(REP_KEY) || "{}");
+    return { tipo: c.tipo || "g", forceIn: c.forceIn || [], forceOut: c.forceOut || [] };
+  }catch(e){ return { tipo: "g", forceIn: [], forceOut: [] }; }
+}
+function repCfgSave(c){ try{ localStorage.setItem(REP_KEY, JSON.stringify(c)); }catch(e){} }
+let repTipo = repCfg().tipo;
+
+/* --- lettura in sola lettura: non crea righe vuote dentro state --- */
+const REP_EMPTY = Object.freeze(emptyRow());
+const repRow  = (cr,iso) => (cr.dati && cr.dati[iso]) || REP_EMPTY;
+const repRows = (crs,days) => crs.flatMap(cr => days.map(d => repRow(cr,d)));
+const repAgg  = (crs,days) => compute(sumRows(repRows(crs,days)), state.params);
+
+/* --- quali campagne sono "obiettivo lead" ---
+   automatiche: hanno lead nel mese e non sono voci di servizio
+   (GHL non attribuito, registro setter). L'utente può correggere
+   la selezione e la scelta viene ricordata per nome campagna. */
+const repPseudo = n => { n = norm(n); return n.includes("non attribuito") || n.includes("registro setter") || n.includes("\u2699"); };
+function repInfo(){
+  const cfg = repCfg(), md = WKS.flatMap(w=>w.days);
+  return state.campagne.map(cp=>{
+    const n = norm(cp.nome), pseudo = repPseudo(cp.nome);
+    const leadMese = sumRows(repRows(crsOfCampagna(cp), md)).lead;
+    const auto = !pseudo && leadMese > 0;
+    const incluso = cfg.forceIn.includes(n) ? true : cfg.forceOut.includes(n) ? false : auto;
+    return { cp, n, pseudo, leadMese, auto, incluso };
+  });
+}
+
+/* --- calendario del report --- */
+const repShift = (iso,k) => { const [y,m,d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m-1, d+k)).toISOString().slice(0,10); };
+const repPrevOf = days => days.map((_,i) => repShift(days[0], i - days.length));
+function repPrevMonthDays(){
+  const [y,m] = state.mese.split("-").map(Number);
+  const pm = m === 1 ? (y-1)+"-12" : y+"-"+pad2(m-1);
+  return calWeeks(pm).flatMap(w=>w.days);
+}
+function repDays(){
+  if(repTipo === "m"){
+    return { nome:"MENSILE", days: WKS.flatMap(w=>w.days), label: meseLabel(state.mese),
+             prev: repPrevMonthDays(), prevLabel: "mese precedente" };
+  }
+  if(repTipo === "s"){
+    const w = WKS[+($("#repWeek").value || 0)] || WKS[0];
+    return { nome:"SETTIMANALE", days: w.days, label: w.label+" ("+w.sub+" "+meseLabel(state.mese)+")",
+             prev: repPrevOf(w.days),
+             prevLabel: w.days.length === 7 ? "settimana precedente" : w.days.length+" giorni precedenti" };
+  }
+  const iso = $("#repDay").value || WKS[0].days[0];
+  return { nome:"GIORNALIERO", days: [iso], label: dayLabel(iso)+" "+meseLabel(state.mese),
+           prev: [repShift(iso,-1)], prevLabel: "giorno precedente" };
+}
+function repLastDataDay(){
+  const crs = crsAll(), days = WKS.flatMap(w=>w.days);
+  for(let i = days.length-1; i >= 0; i--){
+    const s = sumRows(repRows(crs,[days[i]]));
+    if(s.spesa || s.lead || s.fissate || s.cash) return days[i];
+  }
+  return null;
+}
+
+/* --- controlli --- */
+function repFill(){
+  const days = WKS.flatMap(w=>w.days);
+  const today = new Date().toISOString().slice(0,10);
+  let def = repLastDataDay();
+  if(!def) def = days.includes(today) ? today : days[days.length-1];
+  $("#repDay").innerHTML = days.map(d =>
+    `<option value="${d}" ${d===def?"selected":""}>${esc(dayLabel(d))}</option>`).join("");
+  const wi = Math.max(0, WKS.findIndex(w=>w.days.includes(def)));
+  $("#repWeek").innerHTML = WKS.map(w =>
+    `<option value="${w.idx}" ${w.idx===wi?"selected":""}>${esc(w.label)} · ${esc(w.sub)}</option>`).join("");
+  $("#repMese").textContent = meseLabel(state.mese);
+}
+function repTipoUI(){
+  document.querySelectorAll("#repPanel .rbtn").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.rt===repTipo)));
+  $("#repDay").style.display  = repTipo==="g" ? "" : "none";
+  $("#repWeek").style.display = repTipo==="s" ? "" : "none";
+  $("#repMese").style.display = repTipo==="m" ? "" : "none";
+}
+function repCampUI(){
+  const info = repInfo(), box = $("#repCamp");
+  if(!info.length){
+    box.innerHTML = `<span style="font-size:11.5px;color:var(--ink-3)">Nessuna campagna nel mese: premi “Aggiorna adesso” per sincronizzare i dati.</span>`;
+  } else {
+    box.innerHTML = `<div style="font-size:10.5px;color:var(--ink-3);margin-bottom:8px">Spunta le campagne da includere nel report. Preselezione automatica: campagne con lead nel mese (obiettivo lead); escluse engagement e voci di servizio. La scelta viene ricordata.</div>`
+      + info.map(x=>`<label style="display:flex;gap:8px;align-items:center;padding:4px 6px;font-size:12px;cursor:pointer;${x.pseudo?"color:var(--ink-3)":""}">
+          <input type="checkbox" data-repc="${esc(x.n)}" ${x.incluso?"checked":""}>
+          <span>${esc(x.cp.nome)}</span>
+          <span class="num" style="margin-left:auto;color:var(--ink-3);font-size:10.5px">${nf(x.leadMese,0)} lead nel mese${x.pseudo?" · voce di servizio":(!x.auto?" · non-lead":"")}</span>
+        </label>`).join("");
+  }
+  $("#repCampBtn").textContent = `Campagne incluse (${info.filter(x=>x.incluso).length}/${info.length})`;
+}
+$("#repCamp").addEventListener("change", e=>{
+  const el = e.target; if(!el.dataset || !el.dataset.repc) return;
+  const cfg = repCfg(), n = el.dataset.repc;
+  cfg.forceIn  = cfg.forceIn.filter(x=>x!==n);
+  cfg.forceOut = cfg.forceOut.filter(x=>x!==n);
+  const rec = repInfo().find(x=>x.n===n);
+  const auto = rec ? rec.auto : false;
+  if(el.checked && !auto)  cfg.forceIn.push(n);
+  if(!el.checked && auto)  cfg.forceOut.push(n);
+  repCfgSave(cfg); repCampUI();
+});
+
+/* --- confronto con il periodo precedente --- */
+function repDelta(cur, prev, goodUp){
+  cur = +cur || 0; prev = +prev || 0;
+  if(!prev && !cur) return "—";
+  if(!prev) return "nuovo";
+  const d = (cur - prev) / prev;
+  const s = (d > 0 ? "+" : "") + nf(d*100, 0) + "%";
+  const arrow = d > .005 ? "\u25B2" : d < -.005 ? "\u25BC" : "=";
+  const good = goodUp ? d >= 0 : d <= 0;
+  return s + " " + arrow + (Math.abs(d) >= .05 ? (good ? " \u{1F7E2}" : " \u{1F534}") : "");
+}
+
+/* --- migliore e peggiore inserzione del periodo --- */
+function repCreative(inc, days){
+  const soglia = repTipo==="g" ? 15 : repTipo==="s" ? 75 : state.params.spesaMin;
+  const list = [];
+  inc.forEach(x => x.cp.adset.forEach(as => as.creative.forEach(cr => {
+    const r = compute(sumRows(repRows([cr], days)), state.params);
+    if(r.spesa > 0) list.push({ nome: cr.nome, r });
+  })));
+  const conLead   = list.filter(v=>v.r.spesa>=soglia && v.r.lead>0).sort((a,b)=>a.r.cpl-b.r.cpl);
+  const senzaLead = list.filter(v=>v.r.spesa>=soglia && !v.r.lead).sort((a,b)=>b.r.spesa-a.r.spesa);
+  const best  = conLead[0] || null;
+  let worst = senzaLead[0] || (conLead.length>1 ? conLead[conLead.length-1] : null);
+  if(worst && best && worst.nome === best.nome) worst = null;
+  return { best, worst };
+}
+
+/* --- lettura scritta in automatico (senza IA) --- */
+function repLettura(r, rp, per){
+  const P = state.params, out = [];
+  if(r.lead){
+    out.push(r.cpl <= P.cpl
+      ? `CPL a ${fmt(r.cpl,"eur2")}, sotto il target di ${fmt(P.cpl,"eur")}: acquisizione in linea.`
+      : `CPL a ${fmt(r.cpl,"eur2")}, sopra il target di ${fmt(P.cpl,"eur")}: da tenere d'occhio le creative più costose.`);
+  } else if(r.spesa){
+    out.push(`Spesa attiva ma nessun lead registrato nel periodo: da verificare tracciamento e creative.`);
+  }
+  if(rp.lead && r.lead){
+    const d = (r.lead - rp.lead) / rp.lead;
+    if(Math.abs(d) >= .03)
+      out.push(`Lead ${d>=0?"in crescita":"in calo"} del ${nf(Math.abs(d)*100,0)}% rispetto al ${per.prevLabel}${d<-.15?" — capire se pesa il budget, la stanchezza delle creative o il periodo":""}.`);
+  }
+  if(r.fissate && r.show && div(r.show, r.fissate) < .6){
+    out.push(`Show rate al ${fmt(div(r.show,r.fissate),"pct")}: sotto il 60%, utile stringere su conferme e reminder degli appuntamenti.`);
+  }
+  if(r.cash){
+    const pareggio = roasPareggio(P);
+    out.push(r.roasCash >= P.roasScala
+      ? `ROAS cash a ${fmt(r.roasCash,"x")}, sopra la soglia di scala (${fmt(P.roasScala,"x")}): c'è spazio per alzare il budget sulle campagne migliori.`
+      : r.roasCash >= pareggio
+        ? `ROAS cash a ${fmt(r.roasCash,"x")}: sopra il pareggio (${fmt(pareggio,"x")}), zona di mantenimento.`
+        : `ROAS cash a ${fmt(r.roasCash,"x")}, sotto il pareggio (${fmt(pareggio,"x")}): il periodo non si ripaga ancora con il cash incassato.`);
+  } else if(repTipo === "g"){
+    out.push(`Vendite e cash maturano con qualche giorno di ritardo rispetto ai lead: il quadro economico del giorno si completa nei prossimi giorni.`);
+  }
+  const today = new Date().toISOString().slice(0,10);
+  if(per.days.includes(today))
+    out.push(`Il periodo include oggi: i numeri Meta delle ultime ore sono provvisori e si consolidano entro 24–48 ore.`);
+  return out.slice(0,4);
+}
+
+/* --- generazione del testo --- */
+function repGenera(){
+  const inc = repInfo().filter(x=>x.incluso);
+  const per = repDays();
+  const ta = $("#repText");
+  $("#repOut").style.display = "";
+  $("#repAiMsg").textContent = "";
+  if(!inc.length){
+    ta.value = "Nessuna campagna lead inclusa nel report.\nApri \u201CCampagne incluse\u201D qui sopra e spunta almeno una campagna.";
+    return;
+  }
+  const crs = inc.flatMap(x=>crsOfCampagna(x.cp));
+  const r  = repAgg(crs, per.days);
+  const rp = repAgg(crs, per.prev);
+  const P  = state.params;
+  const L = [], H = t => L.push("\u2500\u2500 " + t + " \u2500\u2500");
+  const now = new Date();
+
+  L.push(`\u{1F4CA} REPORT ${per.nome} \u2014 ${per.label}`);
+  L.push(`Freedom University · campagne lead (${inc.length} campagn${inc.length===1?"a":"e"} · ${crs.length} inserzioni)`);
+  L.push(`Generato il ${now.toLocaleDateString("it-IT",{day:"2-digit",month:"2-digit"})} alle ${now.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"})}`
+    + (state.lastSync ? ` · dati sincronizzati ${new Date(state.lastSync).toLocaleString("it-IT",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}` : ""));
+  L.push("");
+
+  H("ADVERTISING");
+  L.push(`Spesa ${fmt(r.spesa,"eur")} · Lead ${nf(r.lead,0)} · CPL ${fmt(r.cpl,"eur2")} (target ${fmt(P.cpl,"eur")})`);
+  L.push(`CTR ${fmt(r.ctr,"pct")} · CPC ${fmt(r.cpc,"eur2")} · CPM ${fmt(r.cpm,"eur2")} · Frequenza ${nf(r.frequenza,2)}`);
+  if(r.visiteVsl) L.push(`Visite landing ${nf(r.visiteVsl,0)} · CVR landing ${fmt(r.cvrLanding,"pct")}`);
+  L.push("");
+
+  H("SETTING");
+  L.push(`Call fissate ${nf(r.fissate,0)} · Set rate su lead ${fmt(r.setRateLead,"pct")}${r.fissate ? ` · CPA fissata ${fmt(r.cpaFissata,"eur2")}` : ""}`);
+  L.push(`Show ${nf(r.show,0)} · Show rate ${fmt(r.showRate,"pct")} · No show ${nf(r.noShow,0)}`);
+  L.push("");
+
+  H("CLOSING");
+  L.push(`Vendite ${nf(r.vendite,0)} · Close rate su show ${fmt(r.crShow,"pct")} · Lead\u2192Vendita ${fmt(r.leadVendita,"pct")}`);
+  L.push("");
+
+  H("ECONOMICS");
+  L.push(`Venduto ${fmt(r.venduto,"eur")} · Cash incassato ${fmt(r.cash,"eur")}`);
+  L.push(`ROAS cash ${fmt(r.roasCash,"x")} · CAC ${fmt(r.cac,"eur")} · Profitto ${fmt(r.profitto,"eur")}`
+    + (repTipo==="m" ? ` · al netto dei fissi (${fmt(P.fissi,"eur")}): ${fmt(r.profitto - P.fissi,"eur")}` : ""));
+  L.push("");
+
+  H("CONFRONTO vs " + per.prevLabel.toUpperCase());
+  L.push(`Spesa ${repDelta(r.spesa,rp.spesa,true)} · Lead ${repDelta(r.lead,rp.lead,true)} · CPL ${repDelta(r.cpl,rp.cpl,false)}`);
+  L.push(`Fissate ${repDelta(r.fissate,rp.fissate,true)} · Vendite ${repDelta(r.vendite,rp.vendite,true)} · Cash ${repDelta(r.cash,rp.cash,true)}`);
+  L.push("");
+
+  H("CAMPAGNE (per spesa)");
+  const righe = inc.map(x=>({ x, r: repAgg(crsOfCampagna(x.cp), per.days) }))
+                   .filter(v=>v.r.spesa || v.r.lead)
+                   .sort((a,b)=>b.r.spesa - a.r.spesa);
+  if(righe.length){
+    righe.forEach((v,i)=>L.push(`${i+1}. ${v.x.cp.nome} \u2014 ${fmt(v.r.spesa,"eur")} · ${nf(v.r.lead,0)} lead · CPL ${fmt(v.r.cpl,"eur2")}`
+      + (v.r.vendite ? ` · ${nf(v.r.vendite,0)} vendit${v.r.vendite===1?"a":"e"} · ROAS ${fmt(v.r.roasCash,"x")}` : "")));
+  } else {
+    L.push("Nessun dato nel periodo per le campagne selezionate.");
+  }
+
+  const cw = repCreative(inc, per.days);
+  if(cw.best || cw.worst){
+    L.push(""); H("IN EVIDENZA");
+    if(cw.best)  L.push(`\u2705 Migliore inserzione: ${cw.best.nome} \u2014 CPL ${fmt(cw.best.r.cpl,"eur2")} con ${fmt(cw.best.r.spesa,"eur")} di spesa`);
+    if(cw.worst) L.push(`\u26A0 Da rivedere: ${cw.worst.nome} \u2014 ${cw.worst.r.lead ? `CPL ${fmt(cw.worst.r.cpl,"eur2")} con ${fmt(cw.worst.r.spesa,"eur")} di spesa` : `${fmt(cw.worst.r.spesa,"eur")} spesi senza lead`}`);
+  }
+
+  const lett = repLettura(r, rp, per);
+  if(lett.length){ L.push(""); H("LETTURA"); lett.forEach(s=>L.push("\u2022 " + s)); }
+
+  ta.value = L.join("\n");
+  ta.scrollTop = 0;
+}
+
+/* --- copia (WhatsApp con *grassetti*, testo semplice, .txt) --- */
+const repWa = t => t.split("\n").map(l=>{
+  const m = l.match(/^\u2500\u2500 (.+) \u2500\u2500$/);
+  if(m) return "*" + m[1] + "*";
+  if(l.indexOf("\u{1F4CA} ") === 0) return "*" + l + "*";
+  return l;
+}).join("\n");
+async function repCopy(txt, btn){
+  let ok = false;
+  try{ await navigator.clipboard.writeText(txt); ok = true; }
+  catch(e){
+    const ta = $("#repText"), old = ta.value;
+    ta.value = txt; ta.focus(); ta.select();
+    try{ ok = document.execCommand("copy"); }catch(_){}
+    ta.value = old;
+  }
+  const old = btn.textContent;
+  btn.textContent = ok ? "\u2713 Copiato" : "Copia non riuscita";
+  setTimeout(()=>{ if(btn.isConnected) btn.textContent = old; }, 1800);
+}
+
+/* --- rifinitura con l'IA (facoltativa, passa dal server) --- */
+async function repAiGo(){
+  const msg = $("#repAiMsg"), btn = $("#repAi"), ta = $("#repText");
+  if(!ta.value.trim()){ msg.textContent = "Genera prima il report."; return; }
+  const pw = getPw();
+  if(!pw){ showLogin(false); return; }
+  btn.disabled = true; msg.textContent = "L'IA sta riscrivendo il report\u2026";
+  try{
+    const r = await fetch(`/api/report-ai?key=${encodeURIComponent(pw)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ report: ta.value })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || j.ok === false) throw new Error(j.error || ("HTTP " + r.status));
+    ta.value = j.testo; ta.scrollTop = 0;
+    msg.textContent = "\u2713 Report rifinito dall'IA: rileggilo e poi copialo.";
+  }catch(err){ msg.textContent = "\u26A0 " + err.message; }
+  btn.disabled = false;
+}
+
+/* --- eventi e avvio della sezione --- */
+document.querySelectorAll("#repPanel .rbtn").forEach(b=>b.addEventListener("click", ()=>{
+  repTipo = b.dataset.rt;
+  const c = repCfg(); c.tipo = repTipo; repCfgSave(c);
+  repTipoUI();
+}));
+$("#repCampBtn").onclick = ()=>{
+  const box = $("#repCamp");
+  const show = box.style.display === "none";
+  if(show) repCampUI();
+  box.style.display = show ? "" : "none";
+};
+$("#repGen").onclick   = repGenera;
+$("#repCopyWa").onclick  = e => repCopy(repWa($("#repText").value), e.target);
+$("#repCopyTxt").onclick = e => repCopy($("#repText").value, e.target);
+$("#repDl").onclick = ()=> download(
+  `Report_${repTipo==="g"?"giornaliero":repTipo==="s"?"settimanale":"mensile"}_${state.mese}.txt`,
+  $("#repText").value, "text/plain;charset=utf-8");
+$("#repAi").onclick = repAiGo;
+/* listener AGGIUNTIVO sul cambio mese: quello esistente resta com'è
+   e viene eseguito per primo; questo aggiorna solo i menu del report */
+$("#mese").addEventListener("change", ()=>setTimeout(()=>{ repFill(); repCampUI(); }, 0));
+
+repFill(); repTipoUI(); repCampUI();
 
 </script>
 </body>
