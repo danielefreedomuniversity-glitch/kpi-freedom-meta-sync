@@ -177,6 +177,7 @@ async function fetchGHL(since, until, shape, warn){
     return null;
   };
   let nTot=0, nFb=0, nAttr=0, nNoUtm=0, cashSum=0;
+  const codaDettagli=[];   /* vinti senza cash leggibile: riletti in dettaglio a fine giro */
 
   /* tutte le opportunità, paginazione a cursore (startAfter): regge qualsiasi volume */
   let got=0, startAfter=null, startAfterId=null, guardia=0;
@@ -227,19 +228,51 @@ async function fetchGHL(since, until, shape, warn){
         if(s.includes("no show")) add(changed,"noShow");
         if(["follow","vinto","perso"].some(x=>s.includes(x))) add(changed,"show");
         if(s.includes("vinto")){
-          const saleDay = dayOf(cfVal(o,"data vendita")) || changed;
-          add(saleDay,"vendite");
-          const venduto = money(cfVal(o,"contrattualizzato")) || (+o.monetaryValue||0);
-          const cash    = money(cfVal(o,"cash collected"));
-          cashSum+=cash;
-          if(venduto) add(saleDay,"venduto",venduto);
-          if(cash)    add(saleDay,"cash",cash);
+          const cashProva = money(cfVal(o,"cash collected"));
+          const contrProva = money(cfVal(o,"contrattualizzato"));
+          if(!cashProva && !contrProva && codaDettagli.length<300){
+            /* la ricerca spesso NON porta i campi custom: rileggo il dettaglio dopo */
+            codaDettagli.push({o, add, changed});
+          } else {
+            const saleDay = dayOf(cfVal(o,"data vendita")) || changed;
+            add(saleDay,"vendite");
+            const venduto = contrProva || (+o.monetaryValue||0);
+            cashSum+=cashProva;
+            if(contrProva) add(saleDay,"contr",contrProva);
+            if(venduto)    add(saleDay,"venduto",venduto);
+            if(cashProva)  add(saleDay,"cash",cashProva);
+          }
         }
       }
     }
     const m=j.meta||{};
     if(list.length<100 || !m.startAfterId) break;
     startAfterId=m.startAfterId; startAfter=m.startAfter;
+  }
+  /* ---- I1: rilettura dettagli per i vinti senza campi custom nella ricerca ---- */
+  if(codaDettagli.length){
+    let letti=0, cashDet=0;
+    for(let i=0;i<codaDettagli.length;i+=8){
+      await Promise.all(codaDettagli.slice(i,i+8).map(async ({o, add, changed})=>{
+        try{
+          const jd = await ghlGET(`/opportunities/${o.id}`);
+          const det = jd.opportunity || jd;
+          const arr = det && (det.customFields||det.customField||det.custom_fields);
+          if(arr && arr.length) o.customFields = arr;
+          letti++;
+        }catch(e){ /* dettaglio non leggibile: uso quello che ho */ }
+        const saleDay = dayOf(cfVal(o,"data vendita")) || changed;
+        add(saleDay,"vendite");
+        const contr = money(cfVal(o,"contrattualizzato"));
+        const cash  = money(cfVal(o,"cash collected"));
+        const venduto = contr || (+o.monetaryValue||0);
+        cashSum+=cash; cashDet+=cash;
+        if(contr)   add(saleDay,"contr",contr);
+        if(venduto) add(saleDay,"venduto",venduto);
+        if(cash)    add(saleDay,"cash",cash);
+      }));
+    }
+    warn.push(`GHL: ${codaDettagli.length} vendite rilette dal dettaglio opportunità (cash recuperato € ${Math.round(cashDet)}).`);
   }
   if(!got) warn.push("GHL: nessuna opportunità ricevuta — controlla token e Location ID.");
   else warn.push(`GHL: ${nFb} opportunità Facebook su ${nTot} totali · ${nAttr} attribuite via UTM · ${nNoUtm} senza UTM (finite in "— GHL non attribuito") · cash letto € ${Math.round(cashSum)}.`);
@@ -290,6 +323,51 @@ async function fetchSetterSheet(since, until, shape, warn){
 }
 
 /* ============================================================
+   RICUCITURA (aggiunta Fase A) — gli UTM scritti a mano negli
+   annunci non coincidono coi nomi veri di Meta: le campagne nate
+   solo da GHL (niente spesa) vengono riagganciate alla campagna
+   Meta che contiene TUTTE le loro parole. AdSet e inserzioni si
+   agganciano per nome uguale, altrimenti in un cassetto
+   "— da GHL (utm)" dentro la campagna giusta.
+   ============================================================ */
+const tokensDi = s => [...new Set(String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+  .replace(/[^a-z0-9]+/g," ").trim().split(" ").filter(x=>x))];
+function fondiDati(dst, src){
+  for(const [iso, rec] of Object.entries(src.dati||{})){
+    if(!dst.dati[iso]) dst.dati[iso]={};
+    for(const [k,v] of Object.entries(rec)) dst.dati[iso][k]=(dst.dati[iso][k]||0)+v;
+  }
+}
+function stitchCampagne(campagne, warn){
+  const haSpesa = cp => cp.adset.some(a=>a.creative.some(cr=>Object.values(cr.dati||{}).some(d=>"spesa" in d)));
+  const meta = campagne.filter(haSpesa);
+  const out = [];
+  for(const cp of campagne){
+    if(haSpesa(cp) || /non attribuito|registro setter|\{\{/.test(cp.nome)){ out.push(cp); continue; }
+    const tk = tokensDi(cp.nome);
+    const cand = meta.filter(m => { const mt=new Set(tokensDi(m.nome)); return tk.length && tk.every(t=>mt.has(t)); });
+    if(cand.length !== 1){ out.push(cp); continue; }
+    const dest = cand[0];
+    const normN = s => tokensDi(s).join(" ");
+    for(const as of cp.adset){
+      let asDest = dest.adset.find(a => normN(a.nome) === normN(as.nome));
+      if(!asDest){
+        if(as.creative.length===1 && normN(as.creative[0].nome)==="" ) { /* mai */ }
+        asDest = dest.adset.find(a => a.nome === "— da GHL (utm non combacianti)");
+        if(!asDest){ asDest = { nome:"— da GHL (utm non combacianti)", creative:[] }; dest.adset.push(asDest); }
+      }
+      for(const cr of as.creative){
+        let crDest = asDest.creative.find(c => normN(c.nome) === normN(cr.nome));
+        if(!crDest){ crDest = { nome: cr.nome, dati:{} }; asDest.creative.push(crDest); }
+        fondiDati(crDest, cr);
+      }
+    }
+    warn.push(`Ricucitura: eventi GHL di "${cp.nome}" agganciati a "${dest.nome}" (utm scritti a mano negli annunci — per il futuro usate {{campaign.name}} / {{adset.name}} / {{ad.name}}).`);
+  }
+  return out;
+}
+
+/* ============================================================
    /api/sync — tutto insieme
    ============================================================ */
 app.get("/api/sync", checkKey, async (req,res)=>{
@@ -322,7 +400,7 @@ app.get("/api/sync", checkKey, async (req,res)=>{
     try{ await fetchGHL(since, until, shape, warn); }catch(e){ warn.push("GHL: "+e.message); }
     await fetchSetterSheet(since, until, shape, warn);
 
-    res.json({ ok:true, since, until, nMeta: metaRows.length, warn, campagne: shape.toArray() });
+    res.json({ ok:true, since, until, nMeta: metaRows.length, warn, campagne: stitchCampagne(shape.toArray(), warn) });
   }catch(err){
     console.error(err);
     res.status(500).json({ ok:false, error:String(err.message||err) });
@@ -358,6 +436,55 @@ app.get("/api/ghl-debug", checkKey, async (_req,res)=>{
     }));
   }catch(e){ out.esempioOpportunita="ERRORE: "+e.message; }
   res.json(out);
+});
+
+/* ============================================================
+   REPORT IA (aggiunta v2.2) — facoltativo, non tocca il resto.
+   Rifinisce il report della dashboard con Claude (Anthropic).
+   Per attivarlo, su Render → Environment aggiungi:
+     ANTHROPIC_API_KEY = chiave presa da console.anthropic.com
+   (facoltativo: ANTHROPIC_MODEL per cambiare modello)
+   Senza chiave l'endpoint risponde 501 e la dashboard mostra
+   comunque il report scritto in locale: nulla si rompe.
+   ============================================================ */
+const REPORT_AI_SYSTEM =
+  "Sei l'analista marketing di Freedom University. Ricevi un report KPI generato da una dashboard " +
+  "(funnel: Meta Ads → lead → setter → closer). Riscrivilo come messaggio professionale, chiaro e " +
+  "sintetico da inviare al responsabile via WhatsApp o email, in italiano. Regole tassative: usa SOLO i numeri " +
+  "presenti nel report, non inventarne e non ricalcolarne; mantieni le sezioni (Advertising, Setting, Closing, " +
+  "Economics, Confronto, Campagne, Lettura) accorpandole solo se vuote; grassetti in stile WhatsApp con " +
+  "*asterischi*; niente tabelle, niente markdown con #; chiudi con una lettura manageriale di 2-3 frasi e UNA " +
+  "raccomandazione operativa concreta. Rispondi solo con il testo del report, senza premesse né commenti.";
+
+app.post("/api/report-ai", checkKey, async (req, res) => {
+  try{
+    const AI_KEY = process.env.ANTHROPIC_API_KEY || "";
+    if(!AI_KEY) return res.status(501).json({ ok:false, error:"IA non configurata: aggiungi ANTHROPIC_API_KEY nelle variabili d'ambiente su Render (chiave da console.anthropic.com)." });
+    const report = String((req.body && req.body.report) || "").slice(0, 20000);
+    if(!report.trim()) return res.status(400).json({ ok:false, error:"Report vuoto." });
+
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": AI_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5",
+        max_tokens: 1500,
+        system: REPORT_AI_SYSTEM,
+        messages: [{ role:"user", content: "Riscrivi questo report KPI per il mio responsabile:\n\n" + report }]
+      })
+    });
+    const j = await r.json();
+    if(j.error) throw new Error(j.error.message || "Errore dell'API IA");
+    const testo = (j.content || []).filter(b => b.type === "text").map(b => b.text).join("\n").trim();
+    if(!testo) throw new Error("Risposta IA vuota.");
+    res.json({ ok:true, testo });
+  }catch(err){
+    res.status(500).json({ ok:false, error:String(err.message || err) });
+  }
 });
 
 app.listen(PORT, ()=>console.log(`KPI server v2 attivo sulla porta ${PORT}`));

@@ -413,6 +413,7 @@ const COLS = [
  {g:"clo",k:"leadVendita", l:"LEAD → VENDITA %",   t:"calc",f:"pct",c:d=>div(d.vendite,d.lead)},
 
  {g:"eco",k:"venduto",     l:"Venduto € (contratti)",t:"in",f:"eur"},
+ {g:"eco",k:"contr",       l:"Contrattualizzato €", t:"in",  f:"eur"},
  {g:"eco",k:"cash",        l:"CASH COLLECTED €",   t:"in",  f:"eur"},
  {g:"eco",k:"pctCash",     l:"% Cash su venduto",  t:"calc",f:"pct",c:d=>div(d.cash,d.venduto)},
  {g:"eco",k:"ticket",      l:"Ticket medio",       t:"calc",f:"eur",c:d=>div(d.venduto,d.vendite)},
@@ -425,6 +426,7 @@ const COLS = [
  {g:"eco",k:"profitto",    l:"PROFITTO €",         t:"calc",f:"eur",c:(d,P)=>(d.cash-d.refund)-d.spesa-(d.cash*(P.closer+P.setter)+d.show*P.bonusShow)},
  {g:"eco",k:"margine",     l:"Margine %",          t:"calc",f:"pct",c:(d,P)=>div((d.cash-d.refund)-d.spesa-(d.cash*(P.closer+P.setter)+d.show*P.bonusShow),d.cash)},
  {g:"eco",k:"epl",         l:"EPL (cash/lead)",    t:"calc",f:"eur2",c:d=>div(d.cash,d.lead)},
+ {g:"eco",k:"vpl",         l:"VPL (venduto/lead)", t:"calc",f:"eur2",c:d=>div(d.venduto,d.lead)},
  {g:"eco",k:"valShow",     l:"Valore / call show", t:"calc",f:"eur2",c:d=>div(d.cash,d.show)},
  {g:"eco",k:"mer",         l:"MER (spesa/cash)",   t:"calc",f:"n2",c:d=>div(d.spesa,d.cash)}
 ];
